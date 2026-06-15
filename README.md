@@ -10,16 +10,14 @@ An MCP (Model Context Protocol) server that provides AI agents with programmatic
 
 ### Features
 
-- **39 MCP tools** covering the full STK Connect command library
-- **Scenario management** — create, load, save, unload scenarios and set time periods
-- **Object creation** — satellites, facilities, targets, sensors
-- **Orbit definition** — TLE (SGP4), classical Keplerian elements, Cartesian state vectors, ephemeris files
-- **Hybrid Connect + COM architecture** — uses COM (`pywin32`) to fix the `UseScenarioAnalysisTime` propagation issue that Connect alone cannot resolve
-- **Conjunction Assessment (CAT/ACAT)** — basic close approach screening and advanced collision probability analysis with threat volumes
-- **Access & AER analysis** — compute visibility windows and azimuth/elevation/range data
-- **Report generation** — query or save STK reports (LLA state, Cartesian position, classical orbit, etc.)
-- **Animation control** — start, pause, step, loop, real-time playback
-- **Raw command passthrough** — send any of STK's 1100+ Connect commands directly
+- **6 consolidated domain tools** with action-based dispatch — clean API for LLM agents
+- **Scenario management** — connect, create, load, save, unload scenarios, set time periods, animation control
+- **Object creation** — satellites, facilities, targets, sensors, constellations, chains, aircraft; object info queries
+- **Orbit definition** — TLE (SGP4), classical Keplerian, Cartesian, ephemeris files; position queries; orbit lifetime estimation
+- **Hybrid Connect + COM architecture** — uses COM (`pywin32`) to fix the `UseScenarioAnalysisTime` propagation issue
+- **Conjunction Assessment (CAT/ACAT)** — basic close approach screening and advanced collision probability (Pc) analysis
+- **Analysis suite** — access/visibility, coverage, communication chains, sensor FOV, radar, lighting conditions
+- **Utilities** — reports, coordinate/date/unit conversion, raw Connect command passthrough (1100+ commands)
 
 ### Prerequisites
 
@@ -127,48 +125,26 @@ stk-mcp
 
 ### Tool Reference
 
-| Category | Tool | Description |
+| Tool | Actions | Description |
 |---|---|---|
-| **Connection** | `stk_connect` | Connect to STK (if not auto-connected at startup) |
-| | `stk_disconnect` | Disconnect from STK |
-| | `stk_status` | Check connection status and current scenario |
-| **Scenario** | `stk_new_scenario` | Create a new scenario with optional time period |
-| | `stk_load_scenario` | Load a `.sc` scenario file |
-| | `stk_save_scenario` | Save the current scenario |
-| | `stk_unload_scenario` | Close the current scenario |
-| | `stk_set_time_period` | Set the analytical time window |
-| **Objects** | `stk_add_satellite` | Add a satellite to the scenario |
-| | `stk_add_facility` | Add a ground station with lat/lon/alt |
-| | `stk_add_target` | Add a ground target |
-| | `stk_add_sensor` | Attach a sensor cone to any object |
-| | `stk_list_objects` | List all objects (optionally filtered by type) |
-| | `stk_unload_object` | Remove an object from the scenario |
-| **Orbits** | `stk_set_orbit_tle` | Set orbit from TLE (SGP4 propagator) |
-| | `stk_set_orbit_classical` | Set orbit from Keplerian elements (HPOP) |
-| | `stk_set_orbit_cartesian` | Set orbit from position/velocity vectors |
-| | `stk_set_orbit_from_file` | Load orbit from an ephemeris file (`.e`) |
-| | `stk_propagate` | Propagate orbit (with COM `UseScenarioAnalysisTime` fix) |
-| **Conjunction** | `stk_cat_setup` | Configure basic CAT parameters |
-| | `stk_cat_compute` | Run basic close approach computation |
-| | `stk_acat_setup` | Configure Advanced CAT (time, threshold, step size) |
-| | `stk_acat_add_primary` | Add primary (protected) object to ACAT |
-| | `stk_acat_add_secondary` | Add secondary (threat) object to ACAT |
-| | `stk_acat_add_secondary_from_database` | Bulk-load secondaries from database file |
-| | `stk_acat_set_prefilters` | Set pre-computation filters (apogee/perigee, orbit path) |
-| | `stk_acat_compute` | Run Advanced CAT computation |
-| | `stk_acat_events` | Retrieve conjunction events (TCA, range, probability) |
-| | `stk_acat_probability` | Compute Pc for a specific pair at a given TCA |
-| | `stk_acat_set_threat_volume` | Configure threat volume ellipsoid dimensions |
-| | `stk_conjunction_assessment` | End-to-end conjunction assessment workflow |
-| **Access** | `stk_compute_access` | Compute access intervals between two objects |
-| | `stk_all_access` | Compute access from one object to all others |
-| | `stk_get_aer` | Get Azimuth/Elevation/Range data |
-| **Reports** | `stk_get_report` | Query report data via Connect socket |
-| | `stk_save_report` | Generate and save a report to file |
-| | `stk_list_report_styles` | List available report styles |
-| **Animation** | `stk_animate` | Control animation (start/pause/reset/step/loop) |
-| | `stk_get_animation_time` | Get current animation time |
-| **Raw** | `stk_send_command` | Send any raw STK Connect command |
+| **`stk_scenario`** | `connect`, `disconnect`, `status`, `new`, `load`, `save`, `unload`, `set_time_period`, `animate` | Scenario lifecycle management |
+| **`stk_objects`** | `add_satellite`, `add_facility`, `add_target`, `add_sensor`, `add_constellation`, `add_chain`, `add_aircraft`, `list`, `remove`, `get_info` | Object creation and management |
+| **`stk_orbit`** | `set_tle`, `set_classical`, `set_cartesian`, `from_file`, `propagate`, `position`, `lifetime` | Orbit definition, propagation, queries |
+| **`stk_conjunction`** | `cat_setup`, `cat_compute`, `acat_setup`, `acat_add_primary`, `acat_add_secondary`, `acat_set_prefilters`, `acat_set_threat_volume`, `acat_compute`, `acat_events`, `acat_probability`, `assess` | Collision warning (CAT + ACAT) |
+| **`stk_analysis`** | `access`, `all_access`, `aer`, `chain_access`, `chain_intervals`, `coverage`, `comm_link`, `sensor_fov`, `visibility`, `radar` | Visibility, coverage, chain, RF analysis |
+| **`stk_util`** | `report`, `save_report`, `list_report_styles`, `convert_coord`, `convert_date`, `convert_unit`, `get_animation_time`, `send_command` | Reports, conversion, raw commands |
+
+**Example usage:**
+```
+stk_scenario(action="new", name="MyScene", start_time="11 Jun 2026 00:00:00", stop_time="+7days")
+stk_objects(action="add_satellite", name="ISS")
+stk_orbit(action="set_tle", satellite_name="ISS", tle_line1="1 25544U ...", tle_line2="2 25544 ...")
+stk_orbit(action="position", satellite_name="ISS", time="14 Jun 2026 12:00:00")
+stk_conjunction(action="assess", primary_satellite="ISS", secondary_satellite="Debris1", ...)
+stk_analysis(action="access", from_object="Satellite/ISS", to_object="Facility/GroundStation")
+stk_util(action="convert_coord", from_coord="ICRF", to_coord="Fixed", coord_values="6778000,0,0")
+stk_util(action="send_command", command="New / */Constellation MyConstellation")
+```
 
 ### Architecture
 
@@ -179,20 +155,16 @@ stk-mcp
 └─────────────────┬───────────────────────────┘
                   │
 ┌─────────────────▼───────────────────────────┐
-│             stk-mcp Server (FastMCP)         │
+│           stk-mcp Server (FastMCP)           │
 │                                              │
-│  ┌──────────┐  ┌──────────┐  ┌───────────┐ │
-│  │ scenario │  │  orbit   │  │   cat     │ │
-│  │  tools   │  │  tools   │  │  tools    │ │
-│  └──────────┘  └──────────┘  └───────────┘ │
-│  ┌──────────┐  ┌──────────┐  ┌───────────┐ │
-│  │ objects  │  │  access  │  │ reports   │ │
-│  │  tools   │  │  tools   │  │  tools    │ │
-│  └──────────┘  └──────────┘  └───────────┘ │
-│  ┌──────────┐  ┌──────────┐                 │
-│  │animation │  │   raw    │                 │
-│  │  tools   │  │  tools   │                 │
-│  └──────────┘  └──────────┘                 │
+│  ┌────────────┐  ┌───────────┐  ┌─────────┐ │
+│  │stk_scenario│  │stk_objects│  │stk_orbit│ │
+│  │ 9 actions  │  │ 10 actions│  │7 actions│ │
+│  └────────────┘  └───────────┘  └─────────┘ │
+│  ┌──────────────┐ ┌───────────┐ ┌──────────┐│
+│  │stk_conjunct. │ │stk_analys.│ │ stk_util ││
+│  │  11 actions  │ │ 10 actions│ │ 8 actions││
+│  └──────────────┘ └───────────┘ └──────────┘│
 │                                              │
 │  ┌─────────────────────────────────────────┐ │
 │  │        StkState (lifespan)              │ │
@@ -236,14 +208,12 @@ stk-mcp/
 │   ├── logic/
 │   │   └── stk_state.py        # State management (Connect + COM)
 │   └── tools/
-│       ├── scenario.py         # Scenario CRUD
-│       ├── orbit.py            # TLE/Classical/Cartesian orbits
-│       ├── objects.py          # Satellites, facilities, sensors
-│       ├── cat.py              # CAT & Advanced CAT
-│       ├── access.py           # Access intervals & AER
-│       ├── reports.py          # STK reports
-│       ├── animation.py        # Animation control
-│       └── raw.py              # Raw command passthrough
+│       ├── scenario.py         # stk_scenario (9 actions)
+│       ├── objects.py          # stk_objects (10 actions)
+│       ├── orbit.py            # stk_orbit (7 actions)
+│       ├── cat.py              # stk_conjunction (11 actions)
+│       ├── analysis.py         # stk_analysis (10 actions)
+│       └── util.py             # stk_util (8 actions)
 └── test_com.py                 # COM interface integration test
 ```
 
@@ -270,16 +240,14 @@ MIT
 
 ### 功能特性
 
-- **39 个 MCP 工具**，覆盖 STK Connect 命令库的主要功能
-- **场景管理** — 创建、加载、保存、卸载场景，设置分析时间窗口
-- **对象创建** — 卫星、地面站、目标点、传感器
-- **轨道定义** — TLE（SGP4 传播器）、经典轨道根数（Keplerian）、笛卡尔状态向量、星历文件
-- **Connect + COM 混合架构** — 通过 COM（`pywin32`）修复 Connect 无法解决的 `UseScenarioAnalysisTime` 传播窗口问题
-- **碰撞预警（CAT/ACAT）** — 基础近距离筛查和高级碰撞概率分析（含威胁体椭球配置）
-- **可见性与 AER 分析** — 计算可见时间窗口和方位角/仰角/距离数据
-- **报告生成** — 查询或保存 STK 报告（LLA 状态、笛卡尔坐标、经典轨道根数等）
-- **动画控制** — 播放、暂停、单步、循环、实时模式
-- **原始命令透传** — 直接发送 STK 的 1100+ Connect 命令中的任意一个
+- **6 个领域工具**，基于 action 参数分发 — 简洁的 LLM Agent 调用接口
+- **场景管理** — 连接、创建、加载、保存、卸载场景，设置时间窗口，动画控制
+- **对象创建** — 卫星、地面站、目标点、传感器、星座、通信链、飞行器；对象属性查询
+- **轨道定义** — TLE（SGP4）、经典轨道根数、笛卡尔状态向量、星历文件；位置查询；轨道寿命估算
+- **Connect + COM 混合架构** — 通过 COM（`pywin32`）修复 `UseScenarioAnalysisTime` 传播窗口问题
+- **碰撞预警（CAT/ACAT）** — 基础近距离筛查和高级碰撞概率（Pc）分析
+- **分析套件** — 可见性、覆盖分析、通信链、传感器视场、雷达、光照条件
+- **工具集** — 报告生成、坐标/时间/单位转换、原始 Connect 命令透传（1100+ 命令）
 
 ### 环境要求
 
@@ -387,48 +355,26 @@ stk-mcp
 
 ### 工具列表
 
-| 类别 | 工具名 | 说明 |
+| 工具 | Actions | 说明 |
 |---|---|---|
-| **连接** | `stk_connect` | 连接 STK（启动时未自动连接时使用） |
-| | `stk_disconnect` | 断开 STK 连接 |
-| | `stk_status` | 检查连接状态和当前场景 |
-| **场景** | `stk_new_scenario` | 创建新场景（可指定时间窗口） |
-| | `stk_load_scenario` | 加载 `.sc` 场景文件 |
-| | `stk_save_scenario` | 保存当前场景 |
-| | `stk_unload_scenario` | 关闭当前场景 |
-| | `stk_set_time_period` | 设置分析时间窗口 |
-| **对象** | `stk_add_satellite` | 添加卫星 |
-| | `stk_add_facility` | 添加地面站（经纬度/海拔） |
-| | `stk_add_target` | 添加地面目标 |
-| | `stk_add_sensor` | 为对象挂载锥形传感器 |
-| | `stk_list_objects` | 列出所有对象（可按类型过滤） |
-| | `stk_unload_object` | 从场景中移除对象 |
-| **轨道** | `stk_set_orbit_tle` | 通过 TLE 设置轨道（SGP4 传播器） |
-| | `stk_set_orbit_classical` | 通过经典轨道根数设置轨道（HPOP） |
-| | `stk_set_orbit_cartesian` | 通过位置/速度向量设置轨道 |
-| | `stk_set_orbit_from_file` | 从星历文件加载轨道（`.e`） |
-| | `stk_propagate` | 传播轨道（含 COM `UseScenarioAnalysisTime` 修复） |
-| **碰撞预警** | `stk_cat_setup` | 配置基础 CAT 参数 |
-| | `stk_cat_compute` | 运行基础近距离分析 |
-| | `stk_acat_setup` | 配置高级 CAT（时间、阈值、步长） |
-| | `stk_acat_add_primary` | 添加主星（被保护对象） |
-| | `stk_acat_add_secondary` | 添加次星（威胁对象） |
-| | `stk_acat_add_secondary_from_database` | 从数据库文件批量加载次星 |
-| | `stk_acat_set_prefilters` | 设置预过滤（近地点/远地点、轨道路径） |
-| | `stk_acat_compute` | 运行高级 CAT 计算 |
-| | `stk_acat_events` | 获取碰撞事件（TCA、距离、概率） |
-| | `stk_acat_probability` | 计算指定对在给定 TCA 的碰撞概率 Pc |
-| | `stk_acat_set_threat_volume` | 配置威胁体椭球尺寸 |
-| | `stk_conjunction_assessment` | 端到端碰撞评估工作流 |
-| **可见性** | `stk_compute_access` | 计算两个对象之间的可见时间窗口 |
-| | `stk_all_access` | 计算一个对象对所有其他对象的可见性 |
-| | `stk_get_aer` | 获取方位角/仰角/距离数据 |
-| **报告** | `stk_get_report` | 通过 Connect 查询报告数据 |
-| | `stk_save_report` | 生成并保存报告到文件 |
-| | `stk_list_report_styles` | 列出可用报告样式 |
-| **动画** | `stk_animate` | 控制动画（播放/暂停/重置/单步/循环） |
-| | `stk_get_animation_time` | 获取当前动画时间 |
-| **原始命令** | `stk_send_command` | 发送任意 STK Connect 原始命令 |
+| **`stk_scenario`** | `connect`, `disconnect`, `status`, `new`, `load`, `save`, `unload`, `set_time_period`, `animate` | 场景生命周期管理 |
+| **`stk_objects`** | `add_satellite`, `add_facility`, `add_target`, `add_sensor`, `add_constellation`, `add_chain`, `add_aircraft`, `list`, `remove`, `get_info` | 对象创建与管理 |
+| **`stk_orbit`** | `set_tle`, `set_classical`, `set_cartesian`, `from_file`, `propagate`, `position`, `lifetime` | 轨道定义、传播、查询 |
+| **`stk_conjunction`** | `cat_setup`, `cat_compute`, `acat_setup`, `acat_add_primary`, `acat_add_secondary`, `acat_set_prefilters`, `acat_set_threat_volume`, `acat_compute`, `acat_events`, `acat_probability`, `assess` | 碰撞预警 (CAT + ACAT) |
+| **`stk_analysis`** | `access`, `all_access`, `aer`, `chain_access`, `chain_intervals`, `coverage`, `comm_link`, `sensor_fov`, `visibility`, `radar` | 可见性、覆盖、链路、射频分析 |
+| **`stk_util`** | `report`, `save_report`, `list_report_styles`, `convert_coord`, `convert_date`, `convert_unit`, `get_animation_time`, `send_command` | 报告、转换、原始命令 |
+
+**调用示例：**
+```
+stk_scenario(action="new", name="CAT_Scene", start_time="11 Jun 2026 00:00:00", stop_time="+7days")
+stk_objects(action="add_satellite", name="Primary")
+stk_orbit(action="set_tle", satellite_name="Primary", tle_line1="1 55107U ...", tle_line2="2 55107 ...")
+stk_orbit(action="position", satellite_name="Primary", time="14 Jun 2026 12:00:00")
+stk_conjunction(action="assess", primary_satellite="Primary", secondary_satellite="Debris1", ...)
+stk_analysis(action="access", from_object="Satellite/Primary", to_object="Facility/GS1")
+stk_util(action="convert_coord", from_coord="ICRF", to_coord="Fixed", coord_values="6778000,0,0")
+stk_util(action="send_command", command="New / */Constellation MyConstellation")
+```
 
 ### 架构设计
 

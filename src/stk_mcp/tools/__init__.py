@@ -1,24 +1,20 @@
-"""STK MCP tool modules."""
+"""STK MCP tool modules — 6 domain tools."""
 
-# Import all tool modules to trigger @mcp_server.tool() registration
+# Import all tool modules to trigger @mcp.tool() registration
 from stk_mcp.tools import (
     scenario,
     objects,
     orbit,
-    access,
     cat,
-    reports,
-    animation,
-    raw,
+    analysis,
+    util,
 )
 
 __all__ = [
     "scenario",
     "objects",
     "orbit",
-    "access",
     "cat",
-    "reports",
-    "animation",
-    "raw",
+    "analysis",
+    "util",
 ]

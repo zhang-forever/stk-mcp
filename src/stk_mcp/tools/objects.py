@@ -1,4 +1,4 @@
-"""Object management tools: add satellites, facilities, targets, sensors."""
+"""stk_objects — Object creation and management (satellites, facilities, sensors, chains, etc.)."""
 
 from __future__ import annotations
 
@@ -8,151 +8,179 @@ from stk_mcp.app import mcp
 
 
 def _get_client(ctx: Context):
-    state = ctx.request_context.lifespan_context
-    return state.client
+    return ctx.request_context.lifespan_context.client
 
 
 @mcp.tool()
-async def stk_add_satellite(ctx: Context, name: str) -> str:
-    """Add a new satellite to the current scenario.
-
-    Args:
-        name: Satellite name (no spaces)
-    """
-    client = _get_client(ctx)
-    result = await client.send_command(f"New / */Satellite {name}")
-    if result["ack"] == "ACK":
-        return f"Satellite '{name}' added"
-    return f"Failed to add satellite: {result}"
-
-
-@mcp.tool()
-async def stk_add_facility(
+async def stk_objects(
     ctx: Context,
-    name: str,
+    action: str,
+    name: str = "",
+    object_path: str = "",
+    parent_path: str = "",
+    object_type: str = "",
     latitude: float = 0.0,
     longitude: float = 0.0,
     altitude: float = 0.0,
-) -> str:
-    """Add a ground facility/station to the scenario.
-
-    Args:
-        name: Facility name
-        latitude: Latitude in degrees (-90 to 90)
-        longitude: Longitude in degrees (-180 to 180)
-        altitude: Altitude in meters above WGS84 ellipsoid
-    """
-    client = _get_client(ctx)
-
-    # Create facility
-    result = await client.send_command(f"New / */Facility {name}")
-    if result["ack"] != "ACK":
-        return f"Failed to add facility: {result}"
-
-    # Set position
-    pos_result = await client.send_command(
-        f"SetPosition */Facility/{name} Geodetic {latitude} {longitude} {altitude}"
-    )
-    if pos_result["ack"] != "ACK":
-        return f"Facility created but position failed: {pos_result}"
-
-    return f"Facility '{name}' added at ({latitude}, {longitude}, {altitude}m)"
-
-
-@mcp.tool()
-async def stk_add_target(
-    ctx: Context,
-    name: str,
-    latitude: float = 0.0,
-    longitude: float = 0.0,
-    altitude: float = 0.0,
-) -> str:
-    """Add a ground target to the scenario.
-
-    Args:
-        name: Target name
-        latitude: Latitude in degrees (-90 to 90)
-        longitude: Longitude in degrees (-180 to 180)
-        altitude: Altitude in meters above WGS84 ellipsoid
-    """
-    client = _get_client(ctx)
-
-    result = await client.send_command(f"New / */Target {name}")
-    if result["ack"] != "ACK":
-        return f"Failed to add target: {result}"
-
-    pos_result = await client.send_command(
-        f"SetPosition */Target/{name} Geodetic {latitude} {longitude} {altitude}"
-    )
-    if pos_result["ack"] != "ACK":
-        return f"Target created but position failed: {pos_result}"
-
-    return f"Target '{name}' added at ({latitude}, {longitude}, {altitude}m)"
-
-
-@mcp.tool()
-async def stk_add_sensor(
-    ctx: Context,
-    parent_path: str,
-    name: str,
     cone_angle: float = 5.0,
+    # constellation / chain params
+    satellite_names: str = "",
+    info_type: str = "properties",
 ) -> str:
-    """Add a sensor to a parent object (satellite, facility, etc.).
+    """Create and manage STK objects.
 
-    Args:
-        parent_path: Parent object path, e.g. "Satellite/Sat1" or "Facility/Fac1"
-        name: Sensor name
-        cone_angle: Half-angle cone in degrees
+    Actions:
+        add_satellite    — Add a satellite. Param: name
+        add_facility     — Add ground station. Params: name, latitude, longitude, altitude
+        add_target       — Add ground target. Params: name, latitude, longitude, altitude
+        add_sensor       — Attach sensor to object. Params: parent_path, name, cone_angle
+        add_constellation — Create constellation from satellite list. Params: name, satellite_names (comma-separated)
+        add_chain        — Create communication chain. Params: name
+        add_aircraft     — Add aircraft object. Params: name
+        list             — List all objects. Param: object_type (optional filter: Satellite, Facility, Target, etc.)
+        remove           — Remove object. Param: object_path (e.g. "Satellite/Sat1")
+        get_info         — Query object info. Params: object_path, info_type (properties/description/subobjects/all)
     """
     client = _get_client(ctx)
 
-    result = await client.send_command(
-        f"New / */{parent_path}/Sensor {name}"
-    )
-    if result["ack"] != "ACK":
-        return f"Failed to add sensor: {result}"
+    # ── add_satellite ────────────────────────────────────────
+    if action == "add_satellite":
+        if not name:
+            return "Parameter 'name' is required"
+        r = await client.send_command(f"New / */Satellite {name}")
+        if r["ack"] == "ACK":
+            return f"Satellite '{name}' added"
+        return f"Failed to add satellite: {r}"
 
-    # Define sensor as simple cone
-    def_result = await client.send_command(
-        f"Define */{parent_path}/Sensor/{name} SimpleCone {cone_angle}"
-    )
-    if def_result["ack"] != "ACK":
-        return f"Sensor created but definition failed: {def_result}"
+    # ── add_facility ─────────────────────────────────────────
+    elif action == "add_facility":
+        if not name:
+            return "Parameter 'name' is required"
+        r = await client.send_command(f"New / */Facility {name}")
+        if r["ack"] != "ACK":
+            return f"Failed to add facility: {r}"
+        await client.send_command(
+            f"SetPosition */Facility/{name} Geodetic {latitude} {longitude} {altitude}"
+        )
+        return f"Facility '{name}' added at ({latitude}, {longitude}, {altitude}m)"
 
-    return f"Sensor '{name}' added to {parent_path} (cone={cone_angle}deg)"
+    # ── add_target ───────────────────────────────────────────
+    elif action == "add_target":
+        if not name:
+            return "Parameter 'name' is required"
+        r = await client.send_command(f"New / */Target {name}")
+        if r["ack"] != "ACK":
+            return f"Failed to add target: {r}"
+        await client.send_command(
+            f"SetPosition */Target/{name} Geodetic {latitude} {longitude} {altitude}"
+        )
+        return f"Target '{name}' added at ({latitude}, {longitude}, {altitude}m)"
 
+    # ── add_sensor ───────────────────────────────────────────
+    elif action == "add_sensor":
+        if not parent_path or not name:
+            return "Parameters 'parent_path' and 'name' are required"
+        r = await client.send_command(f"New / */{parent_path}/Sensor {name}")
+        if r["ack"] != "ACK":
+            return f"Failed to add sensor: {r}"
+        await client.send_command(
+            f"Define */{parent_path}/Sensor/{name} SimpleCone {cone_angle}"
+        )
+        return f"Sensor '{name}' added to {parent_path} (cone={cone_angle}deg)"
 
-@mcp.tool()
-async def stk_list_objects(ctx: Context, object_type: str = "") -> str:
-    """List all objects in the current scenario.
+    # ── add_constellation ────────────────────────────────────
+    elif action == "add_constellation":
+        if not name:
+            return "Parameter 'name' is required"
+        # Create constellation object
+        r = await client.send_command(f"New / */Constellation {name}")
+        if r["ack"] != "ACK":
+            return f"Failed to create constellation: {r}"
+        # Add satellites if provided
+        if satellite_names:
+            added = []
+            for sat_name in satellite_names.split(","):
+                sat_name = sat_name.strip()
+                if sat_name:
+                    ar = await client.send_command(
+                        f"Constellation */Constellation/{name} Add Satellite/{sat_name}"
+                    )
+                    if ar["ack"] == "ACK":
+                        added.append(sat_name)
+            return f"Constellation '{name}' created with {len(added)} satellites: {', '.join(added)}"
+        return f"Constellation '{name}' created (empty — use Constellation Add to populate)"
 
-    Args:
-        object_type: Filter by type, e.g. "Satellite", "Facility", "Target". Empty for all.
-    """
-    client = _get_client(ctx)
+    # ── add_chain ────────────────────────────────────────────
+    elif action == "add_chain":
+        if not name:
+            return "Parameter 'name' is required"
+        r = await client.send_command(f"New / */Chain {name}")
+        if r["ack"] == "ACK":
+            return f"Chain '{name}' created"
+        return f"Failed to create chain: {r}"
 
-    if object_type:
-        cmd = f'AllInstanceNames / */{object_type}'
+    # ── add_aircraft ─────────────────────────────────────────
+    elif action == "add_aircraft":
+        if not name:
+            return "Parameter 'name' is required"
+        r = await client.send_command(f"New / */Aircraft {name}")
+        if r["ack"] == "ACK":
+            return f"Aircraft '{name}' added"
+        return f"Failed to add aircraft: {r}"
+
+    # ── list ─────────────────────────────────────────────────
+    elif action == "list":
+        if object_type:
+            cmd = f"AllInstanceNames / */{object_type}"
+        else:
+            cmd = "AllInstanceNames / *"
+        r = await client.send_command(cmd)
+        if r["ack"] == "ACK" and r["data"]:
+            return "\n".join(r["data"])
+        elif r["ack"] == "ACK":
+            return "No objects found"
+        return f"Failed to list objects: {r}"
+
+    # ── remove ───────────────────────────────────────────────
+    elif action == "remove":
+        if not object_path:
+            return "Parameter 'object_path' is required"
+        r = await client.send_command(f"Unload / */{object_path}")
+        if r["ack"] == "ACK":
+            return f"Object '{object_path}' removed"
+        return f"Failed to remove object: {r}"
+
+    # ── get_info ─────────────────────────────────────────────
+    elif action == "get_info":
+        if not object_path:
+            return "Parameter 'object_path' is required"
+        results = []
+
+        if info_type in ("properties", "all"):
+            r = await client.send_command(f"GetProperties */{object_path}")
+            if r["ack"] == "ACK" and r["data"]:
+                results.append("=== Properties ===")
+                results.append(r["raw"])
+
+        if info_type in ("description", "all"):
+            r = await client.send_command(f"GetDescription */{object_path}")
+            if r["ack"] == "ACK" and r["data"]:
+                results.append("=== Description ===")
+                results.append(r["raw"])
+
+        if info_type in ("subobjects", "all"):
+            r = await client.send_command(f"ListSubObjects */{object_path}")
+            if r["ack"] == "ACK" and r["data"]:
+                results.append("=== Sub-Objects ===")
+                results.append(r["raw"])
+
+        if not results:
+            return f"No info available for '{object_path}' (info_type={info_type})"
+        return "\n".join(results)
+
     else:
-        cmd = "AllInstanceNames / *"
-
-    result = await client.send_command(cmd)
-    if result["ack"] == "ACK" and result["data"]:
-        return "\n".join(result["data"])
-    elif result["ack"] == "ACK":
-        return "No objects found"
-    return f"Failed to list objects: {result}"
-
-
-@mcp.tool()
-async def stk_unload_object(ctx: Context, object_path: str) -> str:
-    """Remove an object from the scenario.
-
-    Args:
-        object_path: Object path, e.g. "Satellite/Sat1" or "Facility/Fac1"
-    """
-    client = _get_client(ctx)
-    result = await client.send_command(f"Unload / */{object_path}")
-    if result["ack"] == "ACK":
-        return f"Object '{object_path}' removed"
-    return f"Failed to remove object: {result}"
+        return (
+            f"Unknown action '{action}'. Valid actions: "
+            "add_satellite, add_facility, add_target, add_sensor, "
+            "add_constellation, add_chain, add_aircraft, list, remove, get_info"
+        )
