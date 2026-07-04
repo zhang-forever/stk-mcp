@@ -380,7 +380,10 @@ stk-mcp/
 │       └── util.py             # stk_util (8 actions)
 ├── skill/
 │   └── SKILL.md                # QoderWork skill definition
-└── test_com.py                 # COM interface integration test
+└── tests/
+    ├── mock_stk_server.py      # Mock STK Connect server for offline tests
+    ├── test_connect_protocol.py # Offline protocol tests (no STK required)
+    └── test_com.py             # COM interface integration test
 ```
 
 ### Known Limitations
@@ -752,7 +755,10 @@ stk-mcp/
 │       └── util.py             # stk_util (8 动作)
 ├── skill/
 │   └── SKILL.md                # QoderWork 技能定义
-└── test_com.py                 # COM 接口集成测试
+└── tests/
+    ├── mock_stk_server.py      # 离线测试用的模拟 STK Connect 服务器
+    ├── test_connect_protocol.py # 离线协议测试（无需 STK）
+    └── test_com.py             # COM 接口集成测试
 ```
 
 ### 已知限制

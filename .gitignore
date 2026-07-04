@@ -34,3 +34,6 @@ desktop.ini
 *.log
 _test_*.py
 skill/
+
+# Internal development instructions — not for public repo
+CLAUDE.md
