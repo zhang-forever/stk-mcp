@@ -141,7 +141,8 @@ Or manually create `.mcp.json` in your project root:
 
 > **Bundled skills**: this repo ships `.claude/skills/` with guided workflows
 > (Walker constellation, coverage & visibility, conjunction assessment, scenario
-> scaffold). Open the project in Claude Code and they load automatically.
+> scaffold, and **analysis report formatting**). Open the project in Claude Code
+> and they load automatically.
 
 </details>
 
@@ -269,14 +270,133 @@ If `stk-mcp` is not in your PATH, use the full path:
 
 ### Tool Reference
 
+Six domain tools, 58 actions. Each tool takes an `action` string plus action-specific
+parameters. Expand each tool below for its full action/parameter table.
+
 | Tool | Actions | Description |
 |---|---|---|
-| **`stk_scenario`** | `connect`, `disconnect`, `status`, `new`, `load`, `save`, `unload`, `set_time_period`, `animate` | Scenario lifecycle and time management |
-| **`stk_objects`** | `add_satellite`, `add_facility`, `add_target`, `add_sensor`, `add_constellation`, `add_chain`, `add_aircraft`, `walker`, `add_coverage`, `compute_coverage`, `list`, `remove`, `get_info` | Create and manage scene objects |
-| **`stk_orbit`** | `set_tle`, `set_classical`, `set_cartesian`, `from_file`, `propagate`, `position`, `lifetime` | Orbit definition, propagation, and queries |
-| **`stk_conjunction`** | `cat_setup`, `cat_compute`, `acat_setup`, `acat_add_primary`, `acat_add_secondary`, `acat_set_prefilters`, `acat_set_threat_volume`, `acat_compute`, `acat_events`, `acat_probability`, `assess` | Collision warning (CAT + ACAT) |
-| **`stk_analysis`** | `access`, `all_access`, `aer`, `chain_access`, `chain_intervals`, `coverage`, `comm_link`, `sensor_fov`, `visibility`, `radar` | Visibility, coverage, and RF analysis |
-| **`stk_util`** | `report`, `save_report`, `list_report_styles`, `convert_coord`, `convert_date`, `convert_unit`, `get_animation_time`, `send_command` | Reports, conversions, raw commands |
+| **`stk_scenario`** | 9 | Scenario lifecycle and time management |
+| **`stk_objects`** | 13 | Create and manage scene objects |
+| **`stk_orbit`** | 7 | Orbit definition, propagation, and queries |
+| **`stk_conjunction`** | 11 | Collision warning (CAT + ACAT) |
+| **`stk_analysis`** | 10 | Visibility, coverage, and RF analysis |
+| **`stk_util`** | 8 | Reports, conversions, raw commands |
+
+<details>
+<summary><b>stk_scenario — Scenario Lifecycle (9 actions)</b></summary>
+
+| Action | Required | Optional | Returns |
+|---|---|---|---|
+| `connect` | — | `host`, `port` | Connection confirmation |
+| `disconnect` | — | — | Disconnect confirmation |
+| `status` | — | — | STK version + scenario loaded state |
+| `new` | `name` | `start_time`, `stop_time` | Scenario created |
+| `load` | `file_path` | — | Scenario loaded from `.sc` |
+| `save` | — | `file_path` | Save confirmation |
+| `unload` | — | — | Scenario closed |
+| `set_time_period` | `start_time`, `stop_time` | — | Analytical window set |
+| `animate` | — | `animate_action` (Start/Pause/Reset/Faster/Slower/StepForward/StepReverse/Loop/RealTime/Refresh) | Animation state |
+
+</details>
+
+<details>
+<summary><b>stk_objects — Object Management (13 actions)</b></summary>
+
+| Action | Required | Optional | Returns |
+|---|---|---|---|
+| `add_satellite` | `name` | — | Satellite created |
+| `add_facility` | `name` | `latitude`, `longitude`, `altitude` | Ground station created |
+| `add_target` | `name` | `latitude`, `longitude`, `altitude` | Ground target created |
+| `add_sensor` | `parent_path`, `name` | `cone_angle` (deg) | Sensor attached |
+| `add_constellation` | `name` | `satellite_names` (comma-sep) | Constellation created |
+| `add_chain` | `name` | — | Comm chain created |
+| `add_aircraft` | `name` | — | Aircraft created |
+| `walker` | `name` (seed sat), `num_planes`, `num_sats_per_plane` | `walker_type` (Delta/Star/Custom), `inter_plane_phase_increment`, `color_by_plane`, `constellation_name` | Walker array built |
+| `add_coverage` | `coverage_name` | `grid_bounds` (Global/LatBounds), `grid_resolution` (deg), `satellite_names`, `fom_type` (Revisit/NAsset) | CoverageDefinition created |
+| `compute_coverage` | `coverage_name` | — | Coverage computed |
+| `list` | — | `object_type` (filter) | Object list |
+| `remove` | `object_path` | — | Object removed |
+| `get_info` | `object_path` | `info_type` (properties/description/subobjects/all) | Object info |
+
+> **Note**: the `walker` seed satellite must already have propagated ephemeris.
+
+</details>
+
+<details>
+<summary><b>stk_orbit — Orbit Definition & Propagation (7 actions)</b></summary>
+
+| Action | Required | Optional | Returns |
+|---|---|---|---|
+| `set_tle` | `satellite_name`, `tle_line1`, `tle_line2` | — | Orbit set (SGP4) + propagated |
+| `set_classical` | `satellite_name` | `semi_major_axis` (m), `eccentricity`, `inclination` (deg), `arg_of_perigee`, `raan`, `true_anomaly`, `epoch`, `coordinate_system`, `force_model`, `step_size` | Keplerian orbit set |
+| `set_cartesian` | `satellite_name` | `x`/`y`/`z` (km), `vx`/`vy`/`vz` (km/s), `epoch`, `coordinate_system`, `force_model`, `step_size` | Cartesian orbit set |
+| `from_file` | `satellite_name`, `file_path` | — | Ephemeris loaded |
+| `propagate` | `satellite_name` | `use_scenario_time` | Propagation confirmation |
+| `position` | `satellite_name` | `time` | Position at time |
+| `lifetime` | `satellite_name` | — | Decay/lifetime estimate |
+
+> `set_classical`/`set_cartesian` default `epoch` to the scenario start time if omitted.
+> COM (Windows) sets `UseScenarioAnalysisTime=True` so propagation spans the full scenario.
+
+</details>
+
+<details>
+<summary><b>stk_conjunction — Collision Warning (11 actions)</b></summary>
+
+| Action | Required | Optional | Returns |
+|---|---|---|---|
+| `cat_setup` | `satellite_name` | `range_threshold` (km), `database_path`, `filter_apogee_perigee`, `filter_orbit_path`, `add_threats`, `max_threats` | CAT configured |
+| `cat_compute` | `satellite_name` | `range_threshold` | Close approaches |
+| `acat_setup` | — | `acat_name`, `start_time`, `stop_time`, `threshold` (km), `sample_step_size` | AdvCAT configured |
+| `acat_add_primary` | `object_path` | `acat_name` | Primary added |
+| `acat_add_secondary` | `secondary_path` **or** `database_path` | `acat_name` | Secondary added |
+| `acat_set_prefilters` | — | `out_of_date`, `apogee_perigee`, `orbit_path`, `time_filter` | Prefilters set |
+| `acat_set_threat_volume` | — | `dimension_type`, `tangential_km`, `cross_track_km`, `normal_km`, `hard_body_radius_m` | Threat volume set |
+| `acat_compute` | — | `acat_name` | Computation done |
+| `acat_events` | — | `acat_name`, `sort_by` | Conjunction events |
+| `acat_probability` | `primary_name`, `secondary_name`, `tca_time` | `method` (Alfano) | Collision probability (Pc) |
+| `assess` | `primary_satellite`, `secondary_satellite` | `tle_*_line1/2`, `start_time`, `stop_time`, `threshold_km` | End-to-end assessment |
+
+> `assess` is the fast path: creates the secondary, sets TLEs, propagates, builds AdvCAT,
+> computes, and returns events in a single call.
+
+</details>
+
+<details>
+<summary><b>stk_analysis — Visibility, Coverage & RF (10 actions)</b></summary>
+
+| Action | Required | Optional | Returns |
+|---|---|---|---|
+| `access` | `from_object`, `to_object` | `time_period`, `max_step_size` | Access intervals |
+| `all_access` | `from_object` | — | Access to all objects |
+| `aer` | `from_object`, `to_object` | `time_period`, `max_step_size` | Azimuth/Elevation/Range |
+| `chain_access` | `chain_name` | — | Chain access analysis |
+| `chain_intervals` | `chain_name` | — | Chain time intervals |
+| `coverage` | `coverage_name` | — | Coverage FOM data |
+| `comm_link` | — | `comm_system`, `query_type` | Comm system query |
+| `sensor_fov` | `sensor_path` | — | Sensor field-of-view |
+| `visibility` | `from_object`, `to_object` | — | Lighting/visibility |
+| `radar` | `object_path` | — | Radar analysis |
+
+> Object paths are relative, e.g. `Satellite/ISS`, `Facility/GS1`, `Satellite/Sat1/Sensor/Sensor1`.
+
+</details>
+
+<details>
+<summary><b>stk_util — Reports, Conversions & Raw Commands (8 actions)</b></summary>
+
+| Action | Required | Optional | Returns |
+|---|---|---|---|
+| `report` | `object_path`, `style` | `time_period`, `time_step`, `access_object`, `all_lines` | Report data |
+| `save_report` | `object_path`, `style`, `file_path` | `time_period`, `time_step`, `access_object` | Save confirmation |
+| `list_report_styles` | `object_path` | — | Available report styles |
+| `convert_coord` | `from_coord`, `to_coord`, `coord_values` | — | Converted coordinates |
+| `convert_date` | `date_string` | `date_format` | Converted date |
+| `convert_unit` | `from_unit`, `to_unit`, `value` | — | Converted value |
+| `get_animation_time` | — | — | Current animation time |
+| `send_command` | `command` | — | Raw Connect command result |
+
+</details>
 
 ### Usage Examples
 
@@ -321,6 +441,92 @@ stk_analysis(action="access",
 ```python
 stk_util(action="send_command",
          command="New / */Constellation MyConstellation")
+```
+
+### Workflow Examples
+
+End-to-end sequences an agent can drive with natural-language prompts.
+
+**1. Conjunction assessment (two objects → risk report)**
+
+```python
+# 1. Scenario + time window
+stk_scenario(action="new", name="CAT_Demo",
+             start_time="1 Jul 2026 00:00:00", stop_time="+2days")
+# 2. End-to-end screen: creates secondary, sets TLEs, propagates, computes
+stk_conjunction(action="assess",
+                primary_satellite="ISS",
+                secondary_satellite="Debris",
+                tle_primary_line1="1 25544U ...", tle_primary_line2="2 25544 ...",
+                tle_secondary_line1="1 30259U ...", tle_secondary_line2="2 30259 ...",
+                start_time="1 Jul 2026 00:00:00", stop_time="3 Jul 2026 00:00:00",
+                threshold_km=10)
+# 3. Drill into a specific pair's collision probability
+stk_conjunction(action="acat_probability",
+                acat_name="ConjunctionAssessment",
+                primary_name="ISS", secondary_name="Debris",
+                tca_time="1 Jul 2026 14:23:11", method="Alfano")
+# → the stk-report skill formats events + Pc into a risk-rated report
+```
+
+**2. Walker constellation + coverage analysis**
+
+```python
+# 1. Seed satellite with propagated ephemeris
+stk_objects(action="add_satellite", name="Seed")
+stk_orbit(action="set_classical", satellite_name="Seed",
+          semi_major_axis=7178137, eccentricity=0.0, inclination=53.0)
+stk_orbit(action="propagate", satellite_name="Seed")
+# 2. Build a 6×4 Walker Delta (24 satellites)
+stk_objects(action="walker", name="Seed", walker_type="Delta",
+            num_planes=6, num_sats_per_plane=4,
+            constellation_name="MyWalker")
+# 3. Define a global coverage grid and compute revisit time
+stk_objects(action="add_coverage", coverage_name="GlobalCov",
+            grid_bounds="Global", grid_resolution=6.0, fom_type="Revisit")
+stk_objects(action="compute_coverage", coverage_name="GlobalCov")
+stk_analysis(action="coverage", coverage_name="GlobalCov")
+# → stk-report skill formats the FOM into a coverage statistics report
+```
+
+**3. Ground-station access + AER report**
+
+```python
+stk_objects(action="add_facility", name="GS1",
+            latitude=40.0, longitude=-105.0, altitude=1600)
+stk_analysis(action="access",
+             from_object="Satellite/ISS", to_object="Facility/GS1")
+stk_analysis(action="aer",
+             from_object="Facility/GS1", to_object="Satellite/ISS",
+             max_step_size=60)
+# → stk-report skill formats contact windows + peak elevation into an access report
+```
+
+### Result Reports
+
+The bundled **`stk-report`** skill (`.claude/skills/stk-report/`) formats raw STK output
+into structured, risk-rated reports. After any analysis, the agent produces a report with:
+
+- **Header** — scenario name, time window, objects involved
+- **Results table** — type-specific (conjunction events, access intervals, AER, coverage, orbit state)
+- **Summary** — plain-language interpretation
+- **Status** — `OK` / `CAUTION` / `WARNING` / `CRITICAL` (conjunction risk is mapped from Pc and miss distance)
+- **Next step** — the concrete follow-up tool/action to call
+
+Example conjunction report:
+
+```markdown
+## STK Analysis Report — Conjunction Assessment
+
+**Scenario**: ISS_CAT  **Time Window**: 1 Jul 2026 00:00 → 2 Jul 2026 00:00
+
+### Conjunction Events
+| # | TCA | Miss Distance (km) | Pc | Risk |
+|---|---|---|---|---|
+| 1 | 2026-07-01 14:23:11 | 3.42 | 2.1e-05 | CAUTION |
+
+**Status**: CAUTION — Pc above monitoring threshold (1e-05)
+**Next step**: continue monitoring; recompute Pc closer to TCA
 ```
 
 ### Architecture
@@ -397,8 +603,12 @@ stk-mcp/
 │       ├── cat.py              # stk_conjunction (11 actions)
 │       ├── analysis.py         # stk_analysis (10 actions)
 │       └── util.py             # stk_util (8 actions)
-├── skill/
-│   └── SKILL.md                # QoderWork skill definition
+├── .claude/skills/             # Bundled Claude Code skills
+│   ├── stk-scenario-scaffold/  # Scenario setup workflow
+│   ├── stk-walker-constellation/ # Walker constellation build
+│   ├── stk-coverage-visibility/  # Coverage & visibility analysis
+│   ├── stk-conjunction/        # Conjunction assessment workflow
+│   └── stk-report/             # Analysis report formatting
 └── tests/
     ├── mock_stk_server.py      # Mock STK Connect server for offline tests
     ├── test_connect_protocol.py # Offline protocol tests (no STK required)
@@ -411,6 +621,21 @@ stk-mcp/
 - **ACAT database format**: `Secondary AddDatabase` only accepts `.sd`/`.tce` files, not plain-text TLE. For TLE catalogs, create satellite objects individually.
 - **STK must be running**: Start STK before launching the server, or use `stk_scenario(action="connect")` to retry.
 - **Windows-only COM**: COM (`STK11.Application`) requires Windows. Connect TCP works cross-platform.
+
+### Troubleshooting
+
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| `Not connected to STK` | STK not running, or Connect Server disabled | Start STK, enable Connect (Edit → Preferences → Connect, port 5001), then `stk_scenario(action="connect")` |
+| Connection refused / timeout | Wrong host/port, or firewall blocking | Verify `STK_PORT=5001`; for remote hosts open the firewall rule and set `STK_HOST` to the STK machine IP |
+| Tool returns `NAK` | Invalid object path, or command needs a loaded scenario | Check the path is relative (`Satellite/ISS`, not `*/Satellite/ISS`); confirm a scenario is loaded via `stk_scenario(action="status")` |
+| Conjunction/access returns no data | Orbits not propagated, or window outside propagation span | Run `stk_orbit(action="propagate", ...)`; ensure the analysis time window overlaps the propagated ephemeris |
+| Orbit only spans ~1.5 h | Connect propagation default (no COM) | Install with `[com]` on Windows so `UseScenarioAnalysisTime` is set automatically |
+| `walker` fails | Seed satellite has no ephemeris | Propagate the seed satellite before calling `walker` |
+| Server won't import | Wrong Python version | Requires Python 3.10+ (3.11 recommended); use `uvx --python 3.11` to avoid PATH issues |
+
+To inspect the raw protocol exchange, use `stk_util(action="send_command", command="...")`
+and read the `ACK`/`NAK` plus data payload directly.
 
 ### Contributing
 
@@ -662,14 +887,132 @@ claude mcp add stk -- stk-mcp
 
 ### 工具列表
 
-| 工具 | Actions | 说明 |
+6 个领域工具，58 个动作。每个工具接受一个 `action` 字符串加动作专属参数。
+展开下方各工具查看完整的动作/参数表。
+
+| 工具 | 动作数 | 说明 |
 |---|---|---|
-| **`stk_scenario`** | `connect`, `disconnect`, `status`, `new`, `load`, `save`, `unload`, `set_time_period`, `animate` | 场景生命周期与时间管理 |
-| **`stk_objects`** | `add_satellite`, `add_facility`, `add_target`, `add_sensor`, `add_constellation`, `add_chain`, `add_aircraft`, `walker`, `add_coverage`, `compute_coverage`, `list`, `remove`, `get_info` | 对象创建与管理 |
-| **`stk_orbit`** | `set_tle`, `set_classical`, `set_cartesian`, `from_file`, `propagate`, `position`, `lifetime` | 轨道定义、传播与查询 |
-| **`stk_conjunction`** | `cat_setup`, `cat_compute`, `acat_setup`, `acat_add_primary`, `acat_add_secondary`, `acat_set_prefilters`, `acat_set_threat_volume`, `acat_compute`, `acat_events`, `acat_probability`, `assess` | 碰撞预警 (CAT + ACAT) |
-| **`stk_analysis`** | `access`, `all_access`, `aer`, `chain_access`, `chain_intervals`, `coverage`, `comm_link`, `sensor_fov`, `visibility`, `radar` | 可见性、覆盖与射频分析 |
-| **`stk_util`** | `report`, `save_report`, `list_report_styles`, `convert_coord`, `convert_date`, `convert_unit`, `get_animation_time`, `send_command` | 报告、转换与原始命令 |
+| **`stk_scenario`** | 9 | 场景生命周期与时间管理 |
+| **`stk_objects`** | 13 | 对象创建与管理 |
+| **`stk_orbit`** | 7 | 轨道定义、传播与查询 |
+| **`stk_conjunction`** | 11 | 碰撞预警 (CAT + ACAT) |
+| **`stk_analysis`** | 10 | 可见性、覆盖与射频分析 |
+| **`stk_util`** | 8 | 报告、转换与原始命令 |
+
+<details>
+<summary><b>stk_scenario — 场景生命周期（9 动作）</b></summary>
+
+| 动作 | 必填 | 可选 | 返回 |
+|---|---|---|---|
+| `connect` | — | `host`, `port` | 连接确认 |
+| `disconnect` | — | — | 断开确认 |
+| `status` | — | — | STK 版本 + 场景加载状态 |
+| `new` | `name` | `start_time`, `stop_time` | 场景已创建 |
+| `load` | `file_path` | — | 从 `.sc` 加载 |
+| `save` | — | `file_path` | 保存确认 |
+| `unload` | — | — | 场景已关闭 |
+| `set_time_period` | `start_time`, `stop_time` | — | 分析时间窗口已设 |
+| `animate` | — | `animate_action`（Start/Pause/Reset/Faster/Slower/StepForward/StepReverse/Loop/RealTime/Refresh） | 动画状态 |
+
+</details>
+
+<details>
+<summary><b>stk_objects — 对象管理（13 动作）</b></summary>
+
+| 动作 | 必填 | 可选 | 返回 |
+|---|---|---|---|
+| `add_satellite` | `name` | — | 卫星已创建 |
+| `add_facility` | `name` | `latitude`, `longitude`, `altitude` | 地面站已创建 |
+| `add_target` | `name` | `latitude`, `longitude`, `altitude` | 地面目标已创建 |
+| `add_sensor` | `parent_path`, `name` | `cone_angle`（度） | 传感器已挂载 |
+| `add_constellation` | `name` | `satellite_names`（逗号分隔） | 星座已创建 |
+| `add_chain` | `name` | — | 通信链已创建 |
+| `add_aircraft` | `name` | — | 飞行器已创建 |
+| `walker` | `name`（种子卫星）, `num_planes`, `num_sats_per_plane` | `walker_type`（Delta/Star/Custom）, `inter_plane_phase_increment`, `color_by_plane`, `constellation_name` | Walker 星座已构建 |
+| `add_coverage` | `coverage_name` | `grid_bounds`（Global/LatBounds）, `grid_resolution`（度）, `satellite_names`, `fom_type`（Revisit/NAsset） | 覆盖定义已创建 |
+| `compute_coverage` | `coverage_name` | — | 覆盖已计算 |
+| `list` | — | `object_type`（过滤） | 对象列表 |
+| `remove` | `object_path` | — | 对象已移除 |
+| `get_info` | `object_path` | `info_type`（properties/description/subobjects/all） | 对象信息 |
+
+> **注意**：`walker` 的种子卫星必须已有传播好的星历。
+
+</details>
+
+<details>
+<summary><b>stk_orbit — 轨道定义与传播（7 动作）</b></summary>
+
+| 动作 | 必填 | 可选 | 返回 |
+|---|---|---|---|
+| `set_tle` | `satellite_name`, `tle_line1`, `tle_line2` | — | 轨道已设 (SGP4) 并传播 |
+| `set_classical` | `satellite_name` | `semi_major_axis`（米）, `eccentricity`, `inclination`（度）, `arg_of_perigee`, `raan`, `true_anomaly`, `epoch`, `coordinate_system`, `force_model`, `step_size` | 经典轨道已设 |
+| `set_cartesian` | `satellite_name` | `x`/`y`/`z`（km）, `vx`/`vy`/`vz`（km/s）, `epoch`, `coordinate_system`, `force_model`, `step_size` | 笛卡尔轨道已设 |
+| `from_file` | `satellite_name`, `file_path` | — | 星历已加载 |
+| `propagate` | `satellite_name` | `use_scenario_time` | 传播确认 |
+| `position` | `satellite_name` | `time` | 指定时刻位置 |
+| `lifetime` | `satellite_name` | — | 寿命/衰减估算 |
+
+> `set_classical`/`set_cartesian` 省略 `epoch` 时默认取场景起始时间。
+> COM（Windows）会设置 `UseScenarioAnalysisTime=True`，使传播覆盖完整场景。
+
+</details>
+
+<details>
+<summary><b>stk_conjunction — 碰撞预警（11 动作）</b></summary>
+
+| 动作 | 必填 | 可选 | 返回 |
+|---|---|---|---|
+| `cat_setup` | `satellite_name` | `range_threshold`（km）, `database_path`, `filter_apogee_perigee`, `filter_orbit_path`, `add_threats`, `max_threats` | CAT 已配置 |
+| `cat_compute` | `satellite_name` | `range_threshold` | 近距离事件 |
+| `acat_setup` | — | `acat_name`, `start_time`, `stop_time`, `threshold`（km）, `sample_step_size` | AdvCAT 已配置 |
+| `acat_add_primary` | `object_path` | `acat_name` | 主对象已添加 |
+| `acat_add_secondary` | `secondary_path` **或** `database_path` | `acat_name` | 次对象已添加 |
+| `acat_set_prefilters` | — | `out_of_date`, `apogee_perigee`, `orbit_path`, `time_filter` | 预筛选已设 |
+| `acat_set_threat_volume` | — | `dimension_type`, `tangential_km`, `cross_track_km`, `normal_km`, `hard_body_radius_m` | 威胁体积已设 |
+| `acat_compute` | — | `acat_name` | 计算完成 |
+| `acat_events` | — | `acat_name`, `sort_by` | 交会事件 |
+| `acat_probability` | `primary_name`, `secondary_name`, `tca_time` | `method`（Alfano） | 碰撞概率 (Pc) |
+| `assess` | `primary_satellite`, `secondary_satellite` | `tle_*_line1/2`, `start_time`, `stop_time`, `threshold_km` | 端到端评估 |
+
+> `assess` 是快捷路径：一次调用完成创建次对象、设 TLE、传播、建 AdvCAT、计算并返回事件。
+
+</details>
+
+<details>
+<summary><b>stk_analysis — 可见性、覆盖与射频（10 动作）</b></summary>
+
+| 动作 | 必填 | 可选 | 返回 |
+|---|---|---|---|
+| `access` | `from_object`, `to_object` | `time_period`, `max_step_size` | 访问时段 |
+| `all_access` | `from_object` | — | 对所有对象的访问 |
+| `aer` | `from_object`, `to_object` | `time_period`, `max_step_size` | 方位/俯仰/距离 |
+| `chain_access` | `chain_name` | — | 通信链访问分析 |
+| `chain_intervals` | `chain_name` | — | 通信链时段 |
+| `coverage` | `coverage_name` | — | 覆盖 FOM 数据 |
+| `comm_link` | — | `comm_system`, `query_type` | 通信系统查询 |
+| `sensor_fov` | `sensor_path` | — | 传感器视场 |
+| `visibility` | `from_object`, `to_object` | — | 光照/可见性 |
+| `radar` | `object_path` | — | 雷达分析 |
+
+> 对象路径为相对路径，如 `Satellite/ISS`、`Facility/GS1`、`Satellite/Sat1/Sensor/Sensor1`。
+
+</details>
+
+<details>
+<summary><b>stk_util — 报告、转换与原始命令（8 动作）</b></summary>
+
+| 动作 | 必填 | 可选 | 返回 |
+|---|---|---|---|
+| `report` | `object_path`, `style` | `time_period`, `time_step`, `access_object`, `all_lines` | 报告数据 |
+| `save_report` | `object_path`, `style`, `file_path` | `time_period`, `time_step`, `access_object` | 保存确认 |
+| `list_report_styles` | `object_path` | — | 可用报告样式 |
+| `convert_coord` | `from_coord`, `to_coord`, `coord_values` | — | 转换后坐标 |
+| `convert_date` | `date_string` | `date_format` | 转换后日期 |
+| `convert_unit` | `from_unit`, `to_unit`, `value` | — | 转换后数值 |
+| `get_animation_time` | — | — | 当前动画时间 |
+| `send_command` | `command` | — | 原始 Connect 命令结果 |
+
+</details>
 
 ### 调用示例
 
@@ -714,6 +1057,92 @@ stk_analysis(action="access",
 ```python
 stk_util(action="send_command",
          command="New / */Constellation MyConstellation")
+```
+
+### 工作流示例
+
+Agent 可通过自然语言驱动的端到端流程。
+
+**1. 碰撞预警（两个对象 → 风险报告）**
+
+```python
+# 1. 场景 + 时间窗口
+stk_scenario(action="new", name="CAT_Demo",
+             start_time="1 Jul 2026 00:00:00", stop_time="+2days")
+# 2. 端到端筛查：创建次对象、设 TLE、传播、计算
+stk_conjunction(action="assess",
+                primary_satellite="ISS",
+                secondary_satellite="Debris",
+                tle_primary_line1="1 25544U ...", tle_primary_line2="2 25544 ...",
+                tle_secondary_line1="1 30259U ...", tle_secondary_line2="2 30259 ...",
+                start_time="1 Jul 2026 00:00:00", stop_time="3 Jul 2026 00:00:00",
+                threshold_km=10)
+# 3. 深入分析某对交会的碰撞概率
+stk_conjunction(action="acat_probability",
+                acat_name="ConjunctionAssessment",
+                primary_name="ISS", secondary_name="Debris",
+                tca_time="1 Jul 2026 14:23:11", method="Alfano")
+# → stk-report 技能将事件 + Pc 格式化为风险评级报告
+```
+
+**2. Walker 星座 + 覆盖分析**
+
+```python
+# 1. 种子卫星（需传播星历）
+stk_objects(action="add_satellite", name="Seed")
+stk_orbit(action="set_classical", satellite_name="Seed",
+          semi_major_axis=7178137, eccentricity=0.0, inclination=53.0)
+stk_orbit(action="propagate", satellite_name="Seed")
+# 2. 构建 6×4 Walker Delta（24 颗卫星）
+stk_objects(action="walker", name="Seed", walker_type="Delta",
+            num_planes=6, num_sats_per_plane=4,
+            constellation_name="MyWalker")
+# 3. 定义全球覆盖网格并计算重访时间
+stk_objects(action="add_coverage", coverage_name="GlobalCov",
+            grid_bounds="Global", grid_resolution=6.0, fom_type="Revisit")
+stk_objects(action="compute_coverage", coverage_name="GlobalCov")
+stk_analysis(action="coverage", coverage_name="GlobalCov")
+# → stk-report 技能将 FOM 格式化为覆盖统计报告
+```
+
+**3. 地面站访问 + AER 报告**
+
+```python
+stk_objects(action="add_facility", name="GS1",
+            latitude=40.0, longitude=-105.0, altitude=1600)
+stk_analysis(action="access",
+             from_object="Satellite/ISS", to_object="Facility/GS1")
+stk_analysis(action="aer",
+             from_object="Facility/GS1", to_object="Satellite/ISS",
+             max_step_size=60)
+# → stk-report 技能将接触窗口 + 峰值仰角格式化为访问报告
+```
+
+### 结果报告
+
+内置的 **`stk-report`** 技能（`.claude/skills/stk-report/`）将 STK 原始输出格式化为
+结构化、带风险评级的报告。任意分析完成后，agent 生成包含以下内容的报告：
+
+- **头部** — 场景名、时间窗口、涉及对象
+- **结果表** — 按类型区分（交会事件、访问时段、AER、覆盖、轨道状态）
+- **摘要** — 通俗语言解读
+- **状态** — `OK` / `CAUTION` / `WARNING` / `CRITICAL`（交会风险由 Pc 和最小距离映射）
+- **后续建议** — 具体的下一步工具/动作调用
+
+交会报告示例：
+
+```markdown
+## STK Analysis Report — Conjunction Assessment
+
+**Scenario**: ISS_CAT  **Time Window**: 1 Jul 2026 00:00 → 2 Jul 2026 00:00
+
+### Conjunction Events
+| # | TCA | Miss Distance (km) | Pc | Risk |
+|---|---|---|---|---|
+| 1 | 2026-07-01 14:23:11 | 3.42 | 2.1e-05 | CAUTION |
+
+**Status**: CAUTION — Pc 超过监控阈值 (1e-05)
+**Next step**: 持续监控；临近 TCA 时重算 Pc
 ```
 
 ### 架构设计
@@ -790,8 +1219,12 @@ stk-mcp/
 │       ├── cat.py              # stk_conjunction (11 动作)
 │       ├── analysis.py         # stk_analysis (10 动作)
 │       └── util.py             # stk_util (8 动作)
-├── skill/
-│   └── SKILL.md                # QoderWork 技能定义
+├── .claude/skills/             # 内置 Claude Code 技能
+│   ├── stk-scenario-scaffold/  # 场景搭建流程
+│   ├── stk-walker-constellation/ # Walker 星座构建
+│   ├── stk-coverage-visibility/  # 覆盖与可见性分析
+│   ├── stk-conjunction/        # 碰撞预警流程
+│   └── stk-report/             # 分析报告格式化
 └── tests/
     ├── mock_stk_server.py      # 离线测试用的模拟 STK Connect 服务器
     ├── test_connect_protocol.py # 离线协议测试（无需 STK）
@@ -804,6 +1237,21 @@ stk-mcp/
 - **ACAT 数据库格式**：`Secondary AddDatabase` 仅接受 `.sd`/`.tce` 文件，不支持纯文本 TLE。TLE 编目需逐个创建卫星对象。
 - **STK 必须运行中**：启动服务器前请先启动 STK，或使用 `stk_scenario(action="connect")` 重试。
 - **COM 仅限 Windows**：COM (`STK11.Application`) 仅在 Windows 上可用。Connect TCP 可跨平台使用。
+
+### 故障排查
+
+| 现象 | 可能原因 | 解决 |
+|---|---|---|
+| `Not connected to STK` | STK 未运行，或 Connect Server 未启用 | 启动 STK，启用 Connect（Edit → Preferences → Connect，端口 5001），再执行 `stk_scenario(action="connect")` |
+| 连接被拒 / 超时 | host/port 错误，或防火墙拦截 | 确认 `STK_PORT=5001`；远程主机需开放防火墙规则并将 `STK_HOST` 设为 STK 机器 IP |
+| 工具返回 `NAK` | 对象路径无效，或命令需要已加载场景 | 检查路径为相对路径（`Satellite/ISS`，非 `*/Satellite/ISS`）；用 `stk_scenario(action="status")` 确认场景已加载 |
+| 交会/访问无数据 | 轨道未传播，或时间窗口超出传播范围 | 执行 `stk_orbit(action="propagate", ...)`；确保分析时间窗口与已传播星历重叠 |
+| 轨道只覆盖约 1.5 小时 | Connect 传播默认值（无 COM） | 在 Windows 上以 `[com]` 安装，`UseScenarioAnalysisTime` 会自动设置 |
+| `walker` 失败 | 种子卫星无星历 | 调用 `walker` 前先传播种子卫星 |
+| 服务器无法导入 | Python 版本错误 | 需 Python 3.10+（推荐 3.11）；用 `uvx --python 3.11` 避免 PATH 问题 |
+
+如需查看原始协议交互，使用 `stk_util(action="send_command", command="...")`，
+可直接读取 `ACK`/`NAK` 及数据载荷。
 
 ### 参与贡献
 
