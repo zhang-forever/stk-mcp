@@ -63,15 +63,20 @@ async def stk_scenario(
             return "Not connected to STK"
         lines = ["Connected to STK"]
         try:
-            r = await client.send_command("GetSTKVersion")
+            # STK Connect requires the "/" scope argument for these commands.
+            r = await client.send_command("GetSTKVersion /")
             if r["ack"] == "ACK" and r["data"]:
                 lines.append(f"Version: {r['raw']}")
         except Exception as e:
             lines.append(f"Version check failed: {e}")
         try:
-            r = await client.send_command("CheckScenario")
+            # "CheckScenario /" returns "1" when a scenario is loaded, "0" otherwise.
+            r = await client.send_command("CheckScenario /")
             if r["ack"] == "ACK" and r["data"]:
-                lines.append(f"Scenario: {r['raw']}")
+                loaded = r["raw"].strip() == "1"
+                lines.append(
+                    "Scenario: loaded" if loaded else "Scenario: None loaded"
+                )
             else:
                 lines.append("Scenario: None loaded")
         except Exception as e:

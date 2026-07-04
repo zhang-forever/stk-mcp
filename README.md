@@ -1,99 +1,137 @@
 # STK MCP Server
 
-**[English](#english)** | **[中文](#中文)**
+<div align="center">
+
+**Give AI agents direct control over [AGI STK](https://www.agi.com/products/stk) — the industry-standard astrodynamics platform.**
+
+[![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)](https://www.python.org/)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![STK](https://img.shields.io/badge/STK-11%2B-orange)](https://www.agi.com/products/stk)
+[![MCP](https://img.shields.io/badge/MCP-1.6%2B-purple)](https://modelcontextprotocol.io/)
+[![GitHub Stars](https://img.shields.io/github/stars/zhang-forever/stk-mcp?style=social)](https://github.com/zhang-forever/stk-mcp)
+
+[English](#english) | [中文](#中文)
+
+</div>
 
 ---
 
 ## English
 
-An MCP (Model Context Protocol) server that provides AI agents with programmatic control over [AGI STK](https://www.agi.com/products/stk) (Systems Tool Kit) via the Connect TCP interface. Enables LLM-powered satellite mission analysis, conjunction assessment, and scenario automation.
+An MCP (Model Context Protocol) server that bridges AI agents with [AGI STK](https://www.agi.com/products/stk) (Systems Tool Kit) via the Connect TCP interface. It enables LLM-powered satellite mission analysis, conjunction assessment, coverage prediction, and scenario automation — all through natural language.
+
+### Why STK + MCP?
+
+STK is the gold standard for space mission analysis, but driving it programmatically requires deep domain knowledge and manual scripting. This server exposes STK's full 1100+ command library through 6 structured MCP tools, letting any AI agent (Claude, GPT, Gemini, etc.) perform complex orbital mechanics, collision screening, and visibility analysis via simple function calls.
 
 ### Features
 
-- **6 consolidated domain tools** with action-based dispatch — clean API for LLM agents
-- **Scenario management** — connect, create, load, save, unload scenarios, set time periods, animation control
-- **Object creation** — satellites, facilities, targets, sensors, constellations, chains, aircraft; object info queries
-- **Orbit definition** — TLE (SGP4), classical Keplerian, Cartesian, ephemeris files; position queries; orbit lifetime estimation
-- **Hybrid Connect + COM architecture** — uses COM (`pywin32`) to fix the `UseScenarioAnalysisTime` propagation issue
-- **Conjunction Assessment (CAT/ACAT)** — basic close approach screening and advanced collision probability (Pc) analysis
-- **Analysis suite** — access/visibility, coverage, communication chains, sensor FOV, radar, lighting conditions
-- **Utilities** — reports, coordinate/date/unit conversion, raw Connect command passthrough (1100+ commands)
+- **6 domain tools, 55 actions** — clean, action-based API designed for LLM consumption
+- **Scenario lifecycle** — create, load, save, configure time windows, animate
+- **Object management** — satellites, ground stations, sensors, constellations, aircraft, comm chains
+- **Orbit definition** — TLE (SGP4), Keplerian elements, Cartesian vectors, ephemeris files, position queries, lifetime estimation
+- **Conjunction assessment** — CAT close-approach screening + ACAT advanced collision probability (Pc) analysis
+- **Analysis suite** — access/visibility windows, AER data, coverage footprints, comm link budgets, sensor FOV, radar cross-section, lighting conditions
+- **Hybrid Connect + COM** — COM fallback (`pywin32`) fixes the `UseScenarioAnalysisTime` propagation limitation
+- **Raw command passthrough** — send any of STK's 1100+ Connect commands directly
+
+### Quick Start
+
+```bash
+# 1. Clone and install
+git clone https://github.com/zhang-forever/stk-mcp.git
+cd stk-mcp
+pip install -e ".[com]"    # COM support included (recommended)
+
+# 2. Make sure STK is running with Connect enabled (port 5001)
+
+# 3. Start the server
+stk-mcp
+```
+
+Then add to your MCP client (see [Client Configuration](#client-configuration) below).
 
 ### Prerequisites
 
 | Requirement | Version | Notes |
 |---|---|---|
-| **AGI STK** | 11+ | With Connect module enabled (Edit → Preferences → Connect, port 5001) |
+| **AGI STK** | 11+ | Connect module enabled (Edit → Preferences → Connect, port 5001) |
 | **Python** | 3.10+ | 3.11 recommended |
-| **pywin32** | latest | Optional — enables COM-backed propagation fix |
+| **pywin32** | latest | Optional — fixes orbit propagation on Windows (included with `[com]` extra) |
 
-### Installation
+### STK Setup
 
-```bash
-git clone https://github.com/zhang-forever/stk-mcp.git
-cd stk-mcp
-pip install -e .
+**Enable Connect in STK:**
 
-# With COM support (recommended on Windows, fixes orbit propagation):
-pip install -e ".[com]"
-```
+Open STK → **Edit** → **Preferences** → **Connect** → Check **Enable Connect Server**, port `5001`.
 
-### STK Setup Guide
-
-Before using this MCP server, STK must be configured to accept Connect commands:
-
-**1. Enable the Connect module in STK:**
-
-Open STK → **Edit** → **Preferences** → **Connect** (under Modules). Check **Enable Connect Server** and set the port to `5001` (default). Click OK.
-
-**2. Verify Connect is listening:**
-
-After enabling, STK should show a small green indicator in the status bar. You can verify with a simple TCP test:
+**Verify connectivity:**
 
 ```bash
-# On the same machine as STK:
 echo "GetSTKVersion" | nc localhost 5001
-# Should return something like: "STK 11.7.1"
+# Expected: "STK 11.7.1" (or your version)
 ```
 
-**3. Firewall (if connecting remotely):**
-
-If the MCP server runs on a different machine, allow inbound TCP on port 5001:
+**Firewall (remote connections only):**
 
 ```powershell
-# Windows Firewall (run as Administrator):
 netsh advfirewall firewall add rule name="STK Connect" dir=in action=allow protocol=TCP localport=5001
 ```
 
-**4. COM support (Windows only, recommended):**
+**COM support (Windows, recommended):**
 
-The Connect `Propagate` command has a known limitation: orbits only propagate ~1.5 hours from the TLE epoch by default (`UseScenarioAnalysisTime=False`). This server uses STK's COM interface (`pywin32`) to set `UseScenarioAnalysisTime=True` before propagation, ensuring orbits cover the full scenario time period.
+STK's Connect `Propagate` command defaults to a ~1.5-hour window from TLE epoch. This server uses COM (`pywin32`) to set `UseScenarioAnalysisTime=True`, ensuring orbits span the full scenario period. Without COM, conjunction assessment and access analysis may return incomplete results.
 
-To enable COM:
-```bash
-pip install pywin32
-```
+### Client Configuration
 
-STK must be **running** for COM to attach. The server auto-detects STK via `GetActiveObject("STK11.Application")`. Without COM, orbit propagation is limited to ~1.5 hours — conjunction assessment and access analysis may return incomplete results.
+The server uses **stdio transport** (default for MCP). Add it to your client's MCP configuration:
 
-### Configuration
+<details open>
+<summary><b>Claude Code</b></summary>
 
-The server connects to STK via TCP on startup. Configure with environment variables:
-
-| Variable | Default | Description |
-|---|---|---|
-| `STK_HOST` | `localhost` | STK host address (use IP if remote) |
-| `STK_PORT` | `5001` | STK Connect TCP port |
-
-### Usage
-
-**As a standalone MCP server (stdio transport):**
+**Recommended — `uvx` (no PATH setup, isolated Python 3.11):**
 
 ```bash
-stk-mcp
+claude mcp add stk --scope user \
+  --env STK_HOST=localhost --env STK_PORT=5001 \
+  -- uvx --python 3.11 --from /path/to/stk-mcp stk-mcp
 ```
 
-**Configure in your MCP client** (e.g. Claude Desktop, QoderWork, Cursor):
+`--scope user` makes the server available in every project. `uvx` auto-provisions
+Python 3.11 and dependencies in an isolated environment, so it works even when your
+system `python` is older than 3.10 and does not require `stk-mcp` on your `PATH`.
+
+**Alternative — installed console script:**
+
+```bash
+pip install -e ".[com]"     # installs the stk-mcp entry point
+claude mcp add stk -- stk-mcp
+```
+
+Or manually create `.mcp.json` in your project root:
+
+```json
+{
+  "mcpServers": {
+    "stk": {
+      "command": "uvx",
+      "args": ["--python", "3.11", "--from", "/path/to/stk-mcp", "stk-mcp"],
+      "env": { "STK_HOST": "localhost", "STK_PORT": "5001" }
+    }
+  }
+}
+```
+
+> **Bundled skills**: this repo ships `.claude/skills/` with guided workflows
+> (Walker constellation, coverage & visibility, conjunction assessment, scenario
+> scaffold). Open the project in Claude Code and they load automatically.
+
+</details>
+
+<details>
+<summary><b>Claude Desktop</b></summary>
+
+Edit `claude_desktop_config.json` (File → Settings → Developer → Edit Config):
 
 ```json
 {
@@ -106,7 +144,79 @@ stk-mcp
 }
 ```
 
-**With environment overrides:**
+</details>
+
+<details>
+<summary><b>Cursor</b></summary>
+
+Add to `.cursor/mcp.json` in your project root, or configure in Settings → MCP:
+
+```json
+{
+  "mcpServers": {
+    "stk": {
+      "command": "stk-mcp",
+      "args": []
+    }
+  }
+}
+```
+
+</details>
+
+<details>
+<summary><b>Windsurf</b></summary>
+
+Edit `~/.codeium/windsurf/mcp_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "stk": {
+      "command": "stk-mcp",
+      "args": []
+    }
+  }
+}
+```
+
+</details>
+
+<details>
+<summary><b>QoderWork</b></summary>
+
+Add via the MCP server settings panel, or configure manually:
+
+```json
+{
+  "mcpServers": {
+    "stk": {
+      "command": "stk-mcp",
+      "args": []
+    }
+  }
+}
+```
+
+</details>
+
+<details>
+<summary><b>Other MCP Clients</b></summary>
+
+Any MCP-compatible client can use this server. Add the following to your client's MCP configuration:
+
+```json
+{
+  "mcpServers": {
+    "stk": {
+      "command": "stk-mcp",
+      "args": []
+    }
+  }
+}
+```
+
+For remote STK instances, pass environment variables:
 
 ```json
 {
@@ -123,27 +233,77 @@ stk-mcp
 }
 ```
 
+If `stk-mcp` is not in your PATH, use the full path:
+
+```json
+{
+  "command": "/path/to/stk-mcp/.venv/Scripts/stk-mcp.exe"
+}
+```
+
+</details>
+
+### Environment Variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `STK_HOST` | `localhost` | STK host address (use IP for remote) |
+| `STK_PORT` | `5001` | STK Connect TCP port |
+
 ### Tool Reference
 
 | Tool | Actions | Description |
 |---|---|---|
-| **`stk_scenario`** | `connect`, `disconnect`, `status`, `new`, `load`, `save`, `unload`, `set_time_period`, `animate` | Scenario lifecycle management |
-| **`stk_objects`** | `add_satellite`, `add_facility`, `add_target`, `add_sensor`, `add_constellation`, `add_chain`, `add_aircraft`, `list`, `remove`, `get_info` | Object creation and management |
-| **`stk_orbit`** | `set_tle`, `set_classical`, `set_cartesian`, `from_file`, `propagate`, `position`, `lifetime` | Orbit definition, propagation, queries |
+| **`stk_scenario`** | `connect`, `disconnect`, `status`, `new`, `load`, `save`, `unload`, `set_time_period`, `animate` | Scenario lifecycle and time management |
+| **`stk_objects`** | `add_satellite`, `add_facility`, `add_target`, `add_sensor`, `add_constellation`, `add_chain`, `add_aircraft`, `list`, `remove`, `get_info` | Create and manage scene objects |
+| **`stk_orbit`** | `set_tle`, `set_classical`, `set_cartesian`, `from_file`, `propagate`, `position`, `lifetime` | Orbit definition, propagation, and queries |
 | **`stk_conjunction`** | `cat_setup`, `cat_compute`, `acat_setup`, `acat_add_primary`, `acat_add_secondary`, `acat_set_prefilters`, `acat_set_threat_volume`, `acat_compute`, `acat_events`, `acat_probability`, `assess` | Collision warning (CAT + ACAT) |
-| **`stk_analysis`** | `access`, `all_access`, `aer`, `chain_access`, `chain_intervals`, `coverage`, `comm_link`, `sensor_fov`, `visibility`, `radar` | Visibility, coverage, chain, RF analysis |
-| **`stk_util`** | `report`, `save_report`, `list_report_styles`, `convert_coord`, `convert_date`, `convert_unit`, `get_animation_time`, `send_command` | Reports, conversion, raw commands |
+| **`stk_analysis`** | `access`, `all_access`, `aer`, `chain_access`, `chain_intervals`, `coverage`, `comm_link`, `sensor_fov`, `visibility`, `radar` | Visibility, coverage, and RF analysis |
+| **`stk_util`** | `report`, `save_report`, `list_report_styles`, `convert_coord`, `convert_date`, `convert_unit`, `get_animation_time`, `send_command` | Reports, conversions, raw commands |
 
-**Example usage:**
-```
-stk_scenario(action="new", name="MyScene", start_time="11 Jun 2026 00:00:00", stop_time="+7days")
+### Usage Examples
+
+**Create a scenario and add a satellite:**
+
+```python
+stk_scenario(action="new", name="ISS_Track",
+             start_time="11 Jun 2026 00:00:00", stop_time="+7days")
 stk_objects(action="add_satellite", name="ISS")
-stk_orbit(action="set_tle", satellite_name="ISS", tle_line1="1 25544U ...", tle_line2="2 25544 ...")
-stk_orbit(action="position", satellite_name="ISS", time="14 Jun 2026 12:00:00")
-stk_conjunction(action="assess", primary_satellite="ISS", secondary_satellite="Debris1", ...)
-stk_analysis(action="access", from_object="Satellite/ISS", to_object="Facility/GroundStation")
-stk_util(action="convert_coord", from_coord="ICRF", to_coord="Fixed", coord_values="6778000,0,0")
-stk_util(action="send_command", command="New / */Constellation MyConstellation")
+stk_orbit(action="set_tle", satellite_name="ISS",
+          tle_line1="1 25544U 98067A   ...",
+          tle_line2="2 25544  51.6442 ...")
+stk_orbit(action="propagate", satellite_name="ISS")
+```
+
+**Query satellite position:**
+
+```python
+stk_orbit(action="position", satellite_name="ISS",
+          time="14 Jun 2026 12:00:00")
+```
+
+**Run conjunction assessment:**
+
+```python
+stk_conjunction(action="assess",
+                primary_satellite="ISS",
+                secondary_satellite="Debris_30259",
+                threshold_km=10)
+```
+
+**Compute access windows:**
+
+```python
+stk_analysis(action="access",
+             from_object="Satellite/ISS",
+             to_object="Facility/GroundStation")
+```
+
+**Send any raw STK command:**
+
+```python
+stk_util(action="send_command",
+         command="New / */Constellation MyConstellation")
 ```
 
 ### Architecture
@@ -151,7 +311,7 @@ stk_util(action="send_command", command="New / */Constellation MyConstellation")
 ```
 ┌─────────────────────────────────────────────┐
 │            MCP Client (LLM Agent)           │
-│              stdio / SSE transport           │
+│                  stdio transport             │
 └─────────────────┬───────────────────────────┘
                   │
 ┌─────────────────▼───────────────────────────┐
@@ -167,10 +327,10 @@ stk_util(action="send_command", command="New / */Constellation MyConstellation")
 │  └──────────────┘ └───────────┘ └──────────┘│
 │                                              │
 │  ┌─────────────────────────────────────────┐ │
-│  │        StkState (lifespan)              │ │
+│  │          StkState (lifespan)            │ │
 │  │  ┌──────────────┐  ┌────────────────┐  │ │
 │  │  │ConnectClient │  │  COM (pywin32) │  │ │
-│  │  │  TCP :5001   │  │ STK11.Application│ │ │
+│  │  │  TCP :5001   │  │STK11.Application│  │ │
 │  │  └──────┬───────┘  └───────┬────────┘  │ │
 │  └─────────┼──────────────────┼────────────┘ │
 └────────────┼──────────────────┼──────────────┘
@@ -181,20 +341,24 @@ stk_util(action="send_command", command="New / */Constellation MyConstellation")
       └────────────────────────────────┘
 ```
 
-The server uses a **dual-protocol** approach:
+**Dual-protocol design:**
 
-- **Connect TCP** (primary): Object creation, orbit setting, ACAT computation, reports — fast and covers 1100+ commands
-- **COM** (supplementary): Fixes the critical `UseScenarioAnalysisTime` property that Connect cannot set, ensuring orbit propagation covers the full scenario time period
+- **Connect TCP** (primary): Object creation, orbit setting, ACAT computation, reports — fast, covers 1100+ commands
+- **COM** (supplementary): Fixes the `UseScenarioAnalysisTime` property that Connect cannot set, ensuring full-scenario orbit propagation
 
-### Known Limitations
+### Connect Protocol Reference
 
-1. **`UseScenarioAnalysisTime`**: The Connect `Propagate` command defaults to a ~1.5-hour window from TLE epoch. The server uses COM to set `UseScenarioAnalysisTime=True` before propagation. Without COM (e.g. on Linux or without pywin32), orbits may not cover the full scenario period.
+STK Connect is a text-based TCP protocol on port 5001:
 
-2. **ACAT database loading**: `Secondary AddDatabase` only accepts STK proprietary formats (`.sd`, `.tce`), not plain-text TLE files. For TLE catalogs, create satellite objects individually via `stk_add_satellite` + `stk_set_orbit_tle`.
+| Operation | Format |
+|---|---|
+| **Send command** | `CommandName ObjectPath Options\n` |
+| **Success** | `ACK\n` |
+| **Failure** | `NAK\n` |
+| **Return data** | 40-byte header `COMMANDNAME  NUMBYTES\n` + data payload |
+| **Multi-line** | Row count first, then repeated header+data per row |
 
-3. **STK must be running**: The server connects to a running STK instance. Start STK before launching the MCP server, or use `stk_connect` to retry.
-
-4. **Windows-only COM**: The COM interface (`STK11.Application`) is only available on Windows with STK installed. Connect TCP works cross-platform if STK is reachable over the network.
+Full command reference: *STK Help → Programming → Connect Command Library*.
 
 ### Project Structure
 
@@ -214,40 +378,68 @@ stk-mcp/
 │       ├── cat.py              # stk_conjunction (11 actions)
 │       ├── analysis.py         # stk_analysis (10 actions)
 │       └── util.py             # stk_util (8 actions)
+├── skill/
+│   └── SKILL.md                # QoderWork skill definition
 └── test_com.py                 # COM interface integration test
 ```
 
-### Connect Protocol
+### Known Limitations
 
-STK Connect is a text-based TCP protocol on port 5001:
+- **Orbit propagation window**: Connect's `Propagate` defaults to ~1.5 hours from TLE epoch. COM fixes this on Windows. Without COM (e.g. Linux), orbits may not cover the full scenario period.
+- **ACAT database format**: `Secondary AddDatabase` only accepts `.sd`/`.tce` files, not plain-text TLE. For TLE catalogs, create satellite objects individually.
+- **STK must be running**: Start STK before launching the server, or use `stk_scenario(action="connect")` to retry.
+- **Windows-only COM**: COM (`STK11.Application`) requires Windows. Connect TCP works cross-platform.
 
-- **Send**: `CommandName ObjectPath Options\n`
-- **Response**: `ACK\n` (success) or `NAK\n` (failure)
-- **Return data**: 40-byte header `COMMANDNAME  NUMBYTES\n` followed by data payload
-- **Multi-line**: First payload is row count, then repeated header+data per row
+### Contributing
 
-See *STK Help → Programming → Connect Command Library* for the full command reference.
+Contributions are welcome. To add new tool actions:
+
+1. Fork the repo and create a feature branch
+2. Add your action in the appropriate tool module under `src/stk_mcp/tools/`
+3. Follow the existing action-dispatch pattern (`if action == "your_action":`)
+4. Test against a running STK instance
+5. Submit a pull request
 
 ### License
 
-MIT
+[MIT](LICENSE) — free for personal and commercial use.
 
 ---
 
 ## 中文
 
-基于 MCP (Model Context Protocol) 的 STK 控制服务器，通过 Connect TCP 接口让 AI Agent 能够程序化控制 [AGI STK](https://www.agi.com/products/stk)（Systems Tool Kit），实现 LLM 驱动的卫星任务分析、碰撞预警和场景自动化。
+基于 MCP (Model Context Protocol) 的 STK 控制服务器，通过 Connect TCP 接口让 AI Agent 直接操控 [AGI STK](https://www.agi.com/products/stk)（Systems Tool Kit）——航天任务分析的行业标准平台。通过自然语言即可驱动卫星任务分析、碰撞预警、覆盖预测和场景自动化。
+
+### 为什么选择 STK + MCP？
+
+STK 是航天任务分析的黄金标准，但编程驱动它需要深厚的领域知识和大量手工脚本。本项目将 STK 的 1100+ 命令库封装为 6 个结构化 MCP 工具，让任何 AI Agent（Claude、GPT、Gemini 等）通过简单的函数调用完成复杂轨道力学、碰撞筛查和可见性分析。
 
 ### 功能特性
 
-- **6 个领域工具**，基于 action 参数分发 — 简洁的 LLM Agent 调用接口
-- **场景管理** — 连接、创建、加载、保存、卸载场景，设置时间窗口，动画控制
-- **对象创建** — 卫星、地面站、目标点、传感器、星座、通信链、飞行器；对象属性查询
-- **轨道定义** — TLE（SGP4）、经典轨道根数、笛卡尔状态向量、星历文件；位置查询；轨道寿命估算
-- **Connect + COM 混合架构** — 通过 COM（`pywin32`）修复 `UseScenarioAnalysisTime` 传播窗口问题
-- **碰撞预警（CAT/ACAT）** — 基础近距离筛查和高级碰撞概率（Pc）分析
-- **分析套件** — 可见性、覆盖分析、通信链、传感器视场、雷达、光照条件
-- **工具集** — 报告生成、坐标/时间/单位转换、原始 Connect 命令透传（1100+ 命令）
+- **6 个领域工具，55 个动作** — 为 LLM 设计的简洁 action 分发接口
+- **场景生命周期** — 创建、加载、保存、配置时间窗口、动画控制
+- **对象管理** — 卫星、地面站、传感器、星座、飞行器、通信链
+- **轨道定义** — TLE (SGP4)、经典轨道根数、笛卡尔向量、星历文件、位置查询、寿命估算
+- **碰撞预警** — CAT 近距离筛查 + ACAT 高级碰撞概率 (Pc) 分析
+- **分析套件** — 可见性窗口、AER 数据、覆盖足迹、通信链路预算、传感器视场、雷达截面、光照条件
+- **Connect + COM 混合架构** — COM 辅助 (`pywin32`) 修复 `UseScenarioAnalysisTime` 传播窗口限制
+- **原始命令透传** — 直接发送 STK 的 1100+ Connect 命令
+
+### 快速开始
+
+```bash
+# 1. 克隆并安装
+git clone https://github.com/zhang-forever/stk-mcp.git
+cd stk-mcp
+pip install -e ".[com]"    # 包含 COM 支持（推荐）
+
+# 2. 确保 STK 已启动且 Connect 已启用（端口 5001）
+
+# 3. 启动服务器
+stk-mcp
+```
+
+然后在你的 MCP 客户端中配置（见下方[客户端配置](#客户端配置)）。
 
 ### 环境要求
 
@@ -255,75 +447,45 @@ MIT
 |---|---|---|
 | **AGI STK** | 11+ | 需启用 Connect 模块（Edit → Preferences → Connect，端口 5001） |
 | **Python** | 3.10+ | 推荐 3.11 |
-| **pywin32** | 最新 | 可选 — 启用 COM 传播修复（仅 Windows） |
+| **pywin32** | 最新 | 可选 — 修复 Windows 上的轨道传播（`[com]` 已包含） |
 
-### 安装
+### STK 配置
 
-```bash
-git clone https://github.com/zhang-forever/stk-mcp.git
-cd stk-mcp
-pip install -e .
+**启用 Connect 模块：**
 
-# 启用 COM 支持（推荐，修复轨道传播窗口问题）：
-pip install -e ".[com]"
-```
+打开 STK → **Edit** → **Preferences** → **Connect** → 勾选 **Enable Connect Server**，端口 `5001`。
 
-### STK 配置指南
-
-在使用本 MCP 服务器之前，需要在 STK 中启用 Connect 模块：
-
-**1. 启用 Connect 模块：**
-
-打开 STK → **Edit** → **Preferences** → **Connect**（在 Modules 下）。勾选 **Enable Connect Server**，端口设为 `5001`（默认值）。点击 OK。
-
-**2. 验证 Connect 是否正常监听：**
-
-启用后，STK 状态栏应出现绿色连接指示器。可用简单的 TCP 测试验证：
+**验证连通性：**
 
 ```bash
-# 在 STK 所在机器上执行：
 echo "GetSTKVersion" | nc localhost 5001
-# 应返回类似：STK 11.7.1
+# 预期返回："STK 11.7.1"（或你的版本号）
 ```
 
-**3. 防火墙设置（远程连接时）：**
-
-如果 MCP 服务器运行在与 STK 不同的机器上，需开放 TCP 5001 端口：
+**防火墙（仅远程连接）：**
 
 ```powershell
-# Windows 防火墙（以管理员身份运行）：
 netsh advfirewall firewall add rule name="STK Connect" dir=in action=allow protocol=TCP localport=5001
 ```
 
-**4. COM 支持（仅 Windows，推荐）：**
+**COM 支持（Windows，推荐）：**
 
-Connect 的 `Propagate` 命令有一个已知限制：默认只传播 TLE 历元起约 1.5 小时（`UseScenarioAnalysisTime=False`）。本服务器通过 STK 的 COM 接口（`pywin32`）在传播前设置 `UseScenarioAnalysisTime=True`，确保轨道覆盖完整场景时段。
+Connect 的 `Propagate` 命令默认只传播 TLE 历元起约 1.5 小时。本服务器通过 COM (`pywin32`) 设置 `UseScenarioAnalysisTime=True`，确保轨道覆盖完整场景时段。没有 COM 时碰撞预警和可见性分析可能返回不完整结果。
 
-启用 COM：
-```bash
-pip install pywin32
-```
+### 客户端配置
 
-STK 必须处于**运行状态**才能挂载 COM。服务器通过 `GetActiveObject("STK11.Application")` 自动检测。没有 COM 时，轨道传播仅限约 1.5 小时——碰撞预警和可见性分析可能返回不完整的结果。
+服务器使用 **stdio 传输**（MCP 默认）。将以下配置添加到你的 MCP 客户端：
 
-### 配置
+<details open>
+<summary><b>Claude Code</b></summary>
 
-服务器启动时通过 TCP 连接 STK，可通过环境变量配置：
-
-| 变量 | 默认值 | 说明 |
-|---|---|---|
-| `STK_HOST` | `localhost` | STK 主机地址（远程时填 IP） |
-| `STK_PORT` | `5001` | STK Connect TCP 端口 |
-
-### 使用方法
-
-**作为独立 MCP 服务器运行（stdio 传输）：**
+在项目目录中运行：
 
 ```bash
-stk-mcp
+claude mcp add stk -- stk-mcp
 ```
 
-**在 MCP 客户端中配置**（如 Claude Desktop、QoderWork、Cursor）：
+或在项目根目录创建 `.mcp.json`：
 
 ```json
 {
@@ -336,7 +498,97 @@ stk-mcp
 }
 ```
 
-**自定义环境变量：**
+</details>
+
+<details>
+<summary><b>Claude Desktop</b></summary>
+
+编辑 `claude_desktop_config.json`（File → Settings → Developer → Edit Config）：
+
+```json
+{
+  "mcpServers": {
+    "stk": {
+      "command": "stk-mcp",
+      "args": []
+    }
+  }
+}
+```
+
+</details>
+
+<details>
+<summary><b>Cursor</b></summary>
+
+在项目根目录创建 `.cursor/mcp.json`，或在 Settings → MCP 中配置：
+
+```json
+{
+  "mcpServers": {
+    "stk": {
+      "command": "stk-mcp",
+      "args": []
+    }
+  }
+}
+```
+
+</details>
+
+<details>
+<summary><b>Windsurf</b></summary>
+
+编辑 `~/.codeium/windsurf/mcp_config.json`：
+
+```json
+{
+  "mcpServers": {
+    "stk": {
+      "command": "stk-mcp",
+      "args": []
+    }
+  }
+}
+```
+
+</details>
+
+<details>
+<summary><b>QoderWork</b></summary>
+
+在 MCP 服务器设置面板中添加，或手动配置：
+
+```json
+{
+  "mcpServers": {
+    "stk": {
+      "command": "stk-mcp",
+      "args": []
+    }
+  }
+}
+```
+
+</details>
+
+<details>
+<summary><b>其他 MCP 客户端</b></summary>
+
+任何兼容 MCP 的客户端均可使用。添加到你的 MCP 配置中：
+
+```json
+{
+  "mcpServers": {
+    "stk": {
+      "command": "stk-mcp",
+      "args": []
+    }
+  }
+}
+```
+
+远程 STK 实例可传入环境变量：
 
 ```json
 {
@@ -353,57 +605,173 @@ stk-mcp
 }
 ```
 
+如果 `stk-mcp` 不在 PATH 中，使用完整路径：
+
+```json
+{
+  "command": "/path/to/stk-mcp/.venv/Scripts/stk-mcp.exe"
+}
+```
+
+</details>
+
+### 环境变量
+
+| 变量 | 默认值 | 说明 |
+|---|---|---|
+| `STK_HOST` | `localhost` | STK 主机地址（远程时填 IP） |
+| `STK_PORT` | `5001` | STK Connect TCP 端口 |
+
 ### 工具列表
 
 | 工具 | Actions | 说明 |
 |---|---|---|
-| **`stk_scenario`** | `connect`, `disconnect`, `status`, `new`, `load`, `save`, `unload`, `set_time_period`, `animate` | 场景生命周期管理 |
+| **`stk_scenario`** | `connect`, `disconnect`, `status`, `new`, `load`, `save`, `unload`, `set_time_period`, `animate` | 场景生命周期与时间管理 |
 | **`stk_objects`** | `add_satellite`, `add_facility`, `add_target`, `add_sensor`, `add_constellation`, `add_chain`, `add_aircraft`, `list`, `remove`, `get_info` | 对象创建与管理 |
-| **`stk_orbit`** | `set_tle`, `set_classical`, `set_cartesian`, `from_file`, `propagate`, `position`, `lifetime` | 轨道定义、传播、查询 |
+| **`stk_orbit`** | `set_tle`, `set_classical`, `set_cartesian`, `from_file`, `propagate`, `position`, `lifetime` | 轨道定义、传播与查询 |
 | **`stk_conjunction`** | `cat_setup`, `cat_compute`, `acat_setup`, `acat_add_primary`, `acat_add_secondary`, `acat_set_prefilters`, `acat_set_threat_volume`, `acat_compute`, `acat_events`, `acat_probability`, `assess` | 碰撞预警 (CAT + ACAT) |
-| **`stk_analysis`** | `access`, `all_access`, `aer`, `chain_access`, `chain_intervals`, `coverage`, `comm_link`, `sensor_fov`, `visibility`, `radar` | 可见性、覆盖、链路、射频分析 |
-| **`stk_util`** | `report`, `save_report`, `list_report_styles`, `convert_coord`, `convert_date`, `convert_unit`, `get_animation_time`, `send_command` | 报告、转换、原始命令 |
+| **`stk_analysis`** | `access`, `all_access`, `aer`, `chain_access`, `chain_intervals`, `coverage`, `comm_link`, `sensor_fov`, `visibility`, `radar` | 可见性、覆盖与射频分析 |
+| **`stk_util`** | `report`, `save_report`, `list_report_styles`, `convert_coord`, `convert_date`, `convert_unit`, `get_animation_time`, `send_command` | 报告、转换与原始命令 |
 
-**调用示例：**
-```
-stk_scenario(action="new", name="CAT_Scene", start_time="11 Jun 2026 00:00:00", stop_time="+7days")
+### 调用示例
+
+**创建场景并添加卫星：**
+
+```python
+stk_scenario(action="new", name="CAT_Scene",
+             start_time="11 Jun 2026 00:00:00", stop_time="+7days")
 stk_objects(action="add_satellite", name="Primary")
-stk_orbit(action="set_tle", satellite_name="Primary", tle_line1="1 55107U ...", tle_line2="2 55107 ...")
-stk_orbit(action="position", satellite_name="Primary", time="14 Jun 2026 12:00:00")
-stk_conjunction(action="assess", primary_satellite="Primary", secondary_satellite="Debris1", ...)
-stk_analysis(action="access", from_object="Satellite/Primary", to_object="Facility/GS1")
-stk_util(action="convert_coord", from_coord="ICRF", to_coord="Fixed", coord_values="6778000,0,0")
-stk_util(action="send_command", command="New / */Constellation MyConstellation")
+stk_orbit(action="set_tle", satellite_name="Primary",
+          tle_line1="1 55107U ...",
+          tle_line2="2 55107 ...")
+stk_orbit(action="propagate", satellite_name="Primary")
+```
+
+**查询卫星位置：**
+
+```python
+stk_orbit(action="position", satellite_name="Primary",
+          time="14 Jun 2026 12:00:00")
+```
+
+**执行碰撞预警分析：**
+
+```python
+stk_conjunction(action="assess",
+                primary_satellite="Primary",
+                secondary_satellite="Debris_30259",
+                threshold_km=10)
+```
+
+**计算可见性窗口：**
+
+```python
+stk_analysis(action="access",
+             from_object="Satellite/Primary",
+             to_object="Facility/GS1")
+```
+
+**发送任意 STK 命令：**
+
+```python
+stk_util(action="send_command",
+         command="New / */Constellation MyConstellation")
 ```
 
 ### 架构设计
 
-服务器采用**双协议**架构：
+```
+┌─────────────────────────────────────────────┐
+│            MCP 客户端 (LLM Agent)            │
+│                  stdio 传输                   │
+└─────────────────┬───────────────────────────┘
+                  │
+┌─────────────────▼───────────────────────────┐
+│           stk-mcp Server (FastMCP)           │
+│                                              │
+│  ┌────────────┐  ┌───────────┐  ┌─────────┐ │
+│  │stk_scenario│  │stk_objects│  │stk_orbit│ │
+│  │  9 actions │  │ 10 actions│  │7 actions│ │
+│  └────────────┘  └───────────┘  └─────────┘ │
+│  ┌──────────────┐ ┌───────────┐ ┌──────────┐│
+│  │stk_conjunct. │ │stk_analys.│ │ stk_util ││
+│  │  11 actions  │ │ 10 actions│ │ 8 actions││
+│  └──────────────┘ └───────────┘ └──────────┘│
+│                                              │
+│  ┌─────────────────────────────────────────┐ │
+│  │          StkState (lifespan)            │ │
+│  │  ┌──────────────┐  ┌────────────────┐  │ │
+│  │  │ConnectClient │  │  COM (pywin32) │  │ │
+│  │  │  TCP :5001   │  │STK11.Application│  │ │
+│  │  └──────┬───────┘  └───────┬────────┘  │ │
+│  └─────────┼──────────────────┼────────────┘ │
+└────────────┼──────────────────┼──────────────┘
+             │                  │
+      ┌──────▼──────────────────▼──────┐
+      │         AGI STK 11+            │
+      │      (运行于本地主机)           │
+      └────────────────────────────────┘
+```
+
+**双协议架构：**
 
 - **Connect TCP**（主通道）：对象创建、轨道设置、ACAT 计算、报告查询 — 速度快，覆盖 1100+ 命令
 - **COM**（辅助通道）：修复 Connect 无法设置的 `UseScenarioAnalysisTime` 属性，确保轨道传播覆盖完整场景时段
 
-### 已知限制
-
-1. **`UseScenarioAnalysisTime`**：Connect 的 `Propagate` 命令默认只传播 TLE 历元起约 1.5 小时。服务器通过 COM 在传播前设置 `UseScenarioAnalysisTime=True`。没有 COM 时（如 Linux 或未安装 pywin32），轨道可能无法覆盖完整场景。
-
-2. **ACAT 数据库加载**：`Secondary AddDatabase` 仅接受 STK 专有格式（`.sd`、`.tce`），不支持纯文本 TLE 文件。TLE 编目数据需通过 `stk_add_satellite` + `stk_set_orbit_tle` 逐个创建。
-
-3. **STK 必须运行中**：服务器连接到正在运行的 STK 实例。启动 MCP 服务器前请先启动 STK，或使用 `stk_connect` 重试连接。
-
-4. **COM 仅限 Windows**：COM 接口（`STK11.Application`）仅在 Windows 上可用。Connect TCP 可跨平台使用（只要网络可达 STK）。
-
-### Connect 协议
+### Connect 协议参考
 
 STK Connect 是基于 TCP 端口 5001 的文本协议：
 
-- **发送**：`命令名 对象路径 参数\n`
-- **响应**：`ACK\n`（成功）或 `NAK\n`（失败）
-- **返回数据**：40 字节头 `COMMANDNAME  NUMBYTES\n` + 数据载荷
-- **多行数据**：首个载荷为行数，然后逐行返回 头+数据
+| 操作 | 格式 |
+|---|---|
+| **发送命令** | `命令名 对象路径 参数\n` |
+| **成功** | `ACK\n` |
+| **失败** | `NAK\n` |
+| **返回数据** | 40 字节头 `COMMANDNAME  NUMBYTES\n` + 数据载荷 |
+| **多行数据** | 首载荷为行数，然后逐行返回 头+数据 |
 
-完整命令参考见 *STK Help → Programming → Connect Command Library*。
+完整命令参考：*STK Help → Programming → Connect Command Library*。
+
+### 项目结构
+
+```
+stk-mcp/
+├── pyproject.toml              # 包配置 (hatchling 构建)
+├── src/stk_mcp/
+│   ├── app.py                  # FastMCP 实例 + 生命周期
+│   ├── server.py               # 入口点，工具注册
+│   ├── connect_client.py       # STK Connect TCP 协议客户端
+│   ├── logic/
+│   │   └── stk_state.py        # 状态管理 (Connect + COM)
+│   └── tools/
+│       ├── scenario.py         # stk_scenario (9 动作)
+│       ├── objects.py          # stk_objects (10 动作)
+│       ├── orbit.py            # stk_orbit (7 动作)
+│       ├── cat.py              # stk_conjunction (11 动作)
+│       ├── analysis.py         # stk_analysis (10 动作)
+│       └── util.py             # stk_util (8 动作)
+├── skill/
+│   └── SKILL.md                # QoderWork 技能定义
+└── test_com.py                 # COM 接口集成测试
+```
+
+### 已知限制
+
+- **轨道传播窗口**：Connect 的 `Propagate` 默认只传播 TLE 历元起约 1.5 小时。COM 在 Windows 上可修复此问题。没有 COM 时轨道可能无法覆盖完整场景。
+- **ACAT 数据库格式**：`Secondary AddDatabase` 仅接受 `.sd`/`.tce` 文件，不支持纯文本 TLE。TLE 编目需逐个创建卫星对象。
+- **STK 必须运行中**：启动服务器前请先启动 STK，或使用 `stk_scenario(action="connect")` 重试。
+- **COM 仅限 Windows**：COM (`STK11.Application`) 仅在 Windows 上可用。Connect TCP 可跨平台使用。
+
+### 参与贡献
+
+欢迎贡献代码。添加新的工具动作：
+
+1. Fork 仓库并创建功能分支
+2. 在 `src/stk_mcp/tools/` 下对应模块中添加 action
+3. 遵循现有的 action 分发模式（`if action == "your_action":`）
+4. 在运行中的 STK 实例上测试
+5. 提交 Pull Request
 
 ### 许可证
 
-MIT
+[MIT](LICENSE) — 个人和商业使用自由。

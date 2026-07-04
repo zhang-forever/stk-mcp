@@ -1,0 +1,19 @@
+{
+  "$comment": "Copy this file to .mcp.json and replace REPLACE_WITH_ABSOLUTE_PATH with the absolute path to this cloned repo. Requires uv (https://docs.astral.sh/uv/). uvx auto-provisions Python 3.11 and dependencies, so no manual install or PATH setup is needed.",
+  "mcpServers": {
+    "stk": {
+      "command": "uvx",
+      "args": [
+        "--python",
+        "3.11",
+        "--from",
+        "REPLACE_WITH_ABSOLUTE_PATH",
+        "stk-mcp"
+      ],
+      "env": {
+        "STK_HOST": "localhost",
+        "STK_PORT": "5001"
+      }
+    }
+  }
+}
