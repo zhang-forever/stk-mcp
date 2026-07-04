@@ -3,37 +3,25 @@
 Tests whether STK 11 COM automation works on this machine,
 bypassing Connect API limitations.
 
-This is a live integration test: it requires Windows, pywin32, and a
-running STK instance. Under pytest it is skipped automatically unless a
-live STK COM connection is available, so it never breaks offline runs.
-Run it directly for a manual COM smoke test:
-    python tests/test_com.py
+This is a stateful live integration test: it creates satellites and an
+AdvCAT object in the active STK scenario, so it must not run automatically
+alongside the offline test suite. Under pytest it is skipped by default and
+only runs when STK_COM_TEST=1 is set, guaranteeing clean offline runs.
+
+Run it explicitly for a manual COM smoke test:
+    python tests/test_com.py                 # direct
+    STK_COM_TEST=1 pytest tests/test_com.py  # via pytest
 """
 
+import os
 import sys
-
-
-def _com_available() -> bool:
-    """Return True only if a live STK COM instance can be reached."""
-    try:
-        import win32com.client
-    except ImportError:
-        return False
-    for prog_id in ["STK12.Application", "STK11.Application", "STK.Application"]:
-        try:
-            win32com.client.GetActiveObject(prog_id)
-            return True
-        except Exception:
-            continue
-    return False
-
 
 try:
     import pytest
 
     pytestmark = pytest.mark.skipif(
-        not _com_available(),
-        reason="requires Windows + pywin32 + a running STK instance",
+        os.environ.get("STK_COM_TEST") != "1",
+        reason="stateful live COM test — set STK_COM_TEST=1 to run",
     )
 except ImportError:
     pass

@@ -26,9 +26,9 @@ STK is the gold standard for space mission analysis, but driving it programmatic
 
 ### Features
 
-- **6 domain tools, 55 actions** — clean, action-based API designed for LLM consumption
+- **6 domain tools, 58 actions** — clean, action-based API designed for LLM consumption
 - **Scenario lifecycle** — create, load, save, configure time windows, animate
-- **Object management** — satellites, ground stations, sensors, constellations, aircraft, comm chains
+- **Object management** — satellites, ground stations, sensors, constellations, Walker arrays, coverage regions, aircraft, comm chains
 - **Orbit definition** — TLE (SGP4), Keplerian elements, Cartesian vectors, ephemeris files, position queries, lifetime estimation
 - **Conjunction assessment** — CAT close-approach screening + ACAT advanced collision probability (Pc) analysis
 - **Analysis suite** — access/visibility windows, AER data, coverage footprints, comm link budgets, sensor FOV, radar cross-section, lighting conditions
@@ -37,16 +37,33 @@ STK is the gold standard for space mission analysis, but driving it programmatic
 
 ### Quick Start
 
-```bash
-# 1. Clone and install
+**One-click install (recommended):**
+
+```powershell
+# Windows (PowerShell) — installs with COM support
 git clone https://github.com/zhang-forever/stk-mcp.git
 cd stk-mcp
-pip install -e ".[com]"    # COM support included (recommended)
+powershell -ExecutionPolicy Bypass -File install.ps1
+```
 
-# 2. Make sure STK is running with Connect enabled (port 5001)
+```bash
+# Linux / macOS — Connect TCP only (COM is Windows-only)
+git clone https://github.com/zhang-forever/stk-mcp.git
+cd stk-mcp
+./install.sh
+```
 
-# 3. Start the server
-stk-mcp
+The installer verifies prerequisites, installs dependencies (via `uv` if
+available, otherwise `pip`), creates `.env`, checks that all 6 tools register,
+and prints the client-configuration snippet.
+
+**Manual install:**
+
+```bash
+git clone https://github.com/zhang-forever/stk-mcp.git
+cd stk-mcp
+pip install -e ".[com]"    # COM support included (recommended on Windows)
+stk-mcp                     # start the server (STK must be running)
 ```
 
 Then add to your MCP client (see [Client Configuration](#client-configuration) below).
@@ -255,7 +272,7 @@ If `stk-mcp` is not in your PATH, use the full path:
 | Tool | Actions | Description |
 |---|---|---|
 | **`stk_scenario`** | `connect`, `disconnect`, `status`, `new`, `load`, `save`, `unload`, `set_time_period`, `animate` | Scenario lifecycle and time management |
-| **`stk_objects`** | `add_satellite`, `add_facility`, `add_target`, `add_sensor`, `add_constellation`, `add_chain`, `add_aircraft`, `list`, `remove`, `get_info` | Create and manage scene objects |
+| **`stk_objects`** | `add_satellite`, `add_facility`, `add_target`, `add_sensor`, `add_constellation`, `add_chain`, `add_aircraft`, `walker`, `add_coverage`, `compute_coverage`, `list`, `remove`, `get_info` | Create and manage scene objects |
 | **`stk_orbit`** | `set_tle`, `set_classical`, `set_cartesian`, `from_file`, `propagate`, `position`, `lifetime` | Orbit definition, propagation, and queries |
 | **`stk_conjunction`** | `cat_setup`, `cat_compute`, `acat_setup`, `acat_add_primary`, `acat_add_secondary`, `acat_set_prefilters`, `acat_set_threat_volume`, `acat_compute`, `acat_events`, `acat_probability`, `assess` | Collision warning (CAT + ACAT) |
 | **`stk_analysis`** | `access`, `all_access`, `aer`, `chain_access`, `chain_intervals`, `coverage`, `comm_link`, `sensor_fov`, `visibility`, `radar` | Visibility, coverage, and RF analysis |
@@ -319,7 +336,7 @@ stk_util(action="send_command",
 │                                              │
 │  ┌────────────┐  ┌───────────┐  ┌─────────┐ │
 │  │stk_scenario│  │stk_objects│  │stk_orbit│ │
-│  │ 9 actions  │  │ 10 actions│  │7 actions│ │
+│  │ 9 actions  │  │ 13 actions│  │7 actions│ │
 │  └────────────┘  └───────────┘  └─────────┘ │
 │  ┌──────────────┐ ┌───────────┐ ┌──────────┐│
 │  │stk_conjunct. │ │stk_analys.│ │ stk_util ││
@@ -365,6 +382,8 @@ Full command reference: *STK Help → Programming → Connect Command Library*.
 ```
 stk-mcp/
 ├── pyproject.toml              # Package config (hatchling build)
+├── install.ps1                 # One-click installer (Windows)
+├── install.sh                  # One-click installer (Linux/macOS)
 ├── src/stk_mcp/
 │   ├── app.py                  # FastMCP instance + lifespan
 │   ├── server.py               # Entry point, tool registration
@@ -373,7 +392,7 @@ stk-mcp/
 │   │   └── stk_state.py        # State management (Connect + COM)
 │   └── tools/
 │       ├── scenario.py         # stk_scenario (9 actions)
-│       ├── objects.py          # stk_objects (10 actions)
+│       ├── objects.py          # stk_objects (13 actions)
 │       ├── orbit.py            # stk_orbit (7 actions)
 │       ├── cat.py              # stk_conjunction (11 actions)
 │       ├── analysis.py         # stk_analysis (10 actions)
@@ -419,9 +438,9 @@ STK 是航天任务分析的黄金标准，但编程驱动它需要深厚的领�
 
 ### 功能特性
 
-- **6 个领域工具，55 个动作** — 为 LLM 设计的简洁 action 分发接口
+- **6 个领域工具，58 个动作** — 为 LLM 设计的简洁 action 分发接口
 - **场景生命周期** — 创建、加载、保存、配置时间窗口、动画控制
-- **对象管理** — 卫星、地面站、传感器、星座、飞行器、通信链
+- **对象管理** — 卫星、地面站、传感器、星座、Walker 星座、覆盖区域、飞行器、通信链
 - **轨道定义** — TLE (SGP4)、经典轨道根数、笛卡尔向量、星历文件、位置查询、寿命估算
 - **碰撞预警** — CAT 近距离筛查 + ACAT 高级碰撞概率 (Pc) 分析
 - **分析套件** — 可见性窗口、AER 数据、覆盖足迹、通信链路预算、传感器视场、雷达截面、光照条件
@@ -430,16 +449,32 @@ STK 是航天任务分析的黄金标准，但编程驱动它需要深厚的领�
 
 ### 快速开始
 
-```bash
-# 1. 克隆并安装
+**一键安装（推荐）：**
+
+```powershell
+# Windows (PowerShell) — 含 COM 支持
 git clone https://github.com/zhang-forever/stk-mcp.git
 cd stk-mcp
-pip install -e ".[com]"    # 包含 COM 支持（推荐）
+powershell -ExecutionPolicy Bypass -File install.ps1
+```
 
-# 2. 确保 STK 已启动且 Connect 已启用（端口 5001）
+```bash
+# Linux / macOS — 仅 Connect TCP（COM 仅限 Windows）
+git clone https://github.com/zhang-forever/stk-mcp.git
+cd stk-mcp
+./install.sh
+```
 
-# 3. 启动服务器
-stk-mcp
+安装脚本会自动检查环境、安装依赖（优先用 `uv`，否则回退 `pip`）、创建 `.env`、
+验证 6 个工具注册成功，并打印客户端配置片段。
+
+**手动安装：**
+
+```bash
+git clone https://github.com/zhang-forever/stk-mcp.git
+cd stk-mcp
+pip install -e ".[com]"    # 包含 COM 支持（Windows 推荐）
+stk-mcp                     # 启动服务器（需 STK 已运行）
 ```
 
 然后在你的 MCP 客户端中配置（见下方[客户端配置](#客户端配置)）。
@@ -630,7 +665,7 @@ claude mcp add stk -- stk-mcp
 | 工具 | Actions | 说明 |
 |---|---|---|
 | **`stk_scenario`** | `connect`, `disconnect`, `status`, `new`, `load`, `save`, `unload`, `set_time_period`, `animate` | 场景生命周期与时间管理 |
-| **`stk_objects`** | `add_satellite`, `add_facility`, `add_target`, `add_sensor`, `add_constellation`, `add_chain`, `add_aircraft`, `list`, `remove`, `get_info` | 对象创建与管理 |
+| **`stk_objects`** | `add_satellite`, `add_facility`, `add_target`, `add_sensor`, `add_constellation`, `add_chain`, `add_aircraft`, `walker`, `add_coverage`, `compute_coverage`, `list`, `remove`, `get_info` | 对象创建与管理 |
 | **`stk_orbit`** | `set_tle`, `set_classical`, `set_cartesian`, `from_file`, `propagate`, `position`, `lifetime` | 轨道定义、传播与查询 |
 | **`stk_conjunction`** | `cat_setup`, `cat_compute`, `acat_setup`, `acat_add_primary`, `acat_add_secondary`, `acat_set_prefilters`, `acat_set_threat_volume`, `acat_compute`, `acat_events`, `acat_probability`, `assess` | 碰撞预警 (CAT + ACAT) |
 | **`stk_analysis`** | `access`, `all_access`, `aer`, `chain_access`, `chain_intervals`, `coverage`, `comm_link`, `sensor_fov`, `visibility`, `radar` | 可见性、覆盖与射频分析 |
@@ -694,7 +729,7 @@ stk_util(action="send_command",
 │                                              │
 │  ┌────────────┐  ┌───────────┐  ┌─────────┐ │
 │  │stk_scenario│  │stk_objects│  │stk_orbit│ │
-│  │  9 actions │  │ 10 actions│  │7 actions│ │
+│  │  9 actions │  │ 13 actions│  │7 actions│ │
 │  └────────────┘  └───────────┘  └─────────┘ │
 │  ┌──────────────┐ ┌───────────┐ ┌──────────┐│
 │  │stk_conjunct. │ │stk_analys.│ │ stk_util ││
@@ -740,6 +775,8 @@ STK Connect 是基于 TCP 端口 5001 的文本协议：
 ```
 stk-mcp/
 ├── pyproject.toml              # 包配置 (hatchling 构建)
+├── install.ps1                 # 一键安装脚本 (Windows)
+├── install.sh                  # 一键安装脚本 (Linux/macOS)
 ├── src/stk_mcp/
 │   ├── app.py                  # FastMCP 实例 + 生命周期
 │   ├── server.py               # 入口点，工具注册
@@ -748,7 +785,7 @@ stk-mcp/
 │   │   └── stk_state.py        # 状态管理 (Connect + COM)
 │   └── tools/
 │       ├── scenario.py         # stk_scenario (9 动作)
-│       ├── objects.py          # stk_objects (10 动作)
+│       ├── objects.py          # stk_objects (13 动作)
 │       ├── orbit.py            # stk_orbit (7 动作)
 │       ├── cat.py              # stk_conjunction (11 动作)
 │       ├── analysis.py         # stk_analysis (10 动作)
