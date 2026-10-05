@@ -36,7 +36,13 @@ async def test_assess_distinguishes_failed_event_query_from_no_events(ack, expec
     async def send(command):
         if command.startswith("ACATEvents_RM"):
             return {"ack": ack, "data": None, "raw": ""}
-        return {"ack": "ACK", "data": ["Yes"], "raw": "Yes"}
+        if command == "Units_Get * Connect":
+            return {"ack": "ACK", "data": ["Distance Meters; Time Seconds;"], "raw": ""}
+        if command.startswith("Units_Convert"):
+            return {"ack": "ACK", "data": ["5000"], "raw": "5000"}
+        if command.startswith("DoesObjExist"):
+            return {"ack": "ACK", "data": ["1"], "raw": "1"}
+        return {"ack": "ACK", "data": None, "raw": ""}
     client = SimpleNamespace(send_command=AsyncMock(side_effect=send))
     result = await stk_conjunction(_context(client), "assess",
                                    primary_satellite="Primary", secondary_satellite="Secondary")

@@ -360,7 +360,11 @@ parameters. Expand each tool below for its full action/parameter table.
 > `acat_set_threat_volume` currently returns an explicit unsupported result and changes no STK settings. Dimensions and hard-body radius must be bound to a primary/secondary object using STK or the [ACAT command](https://help.agi.com/stk/Subsystems/connectCmds/Content/cmd_ACAT.htm), with the appropriate Connect units.
 
 > `assess` is the fast path: creates the secondary, sets TLEs, propagates, builds AdvCAT,
-> computes, and returns events in a single call.
+> computes, and returns events in a single call. Each call creates a fresh `ConjunctionAssessment_<id>` object (named in the result), so previous pairs cannot contaminate the current assessment. Existing assessment objects are retained. `New ... NoDefault` bypasses user-saved object defaults for the new assessment.
+
+> Numeric CAT/ACAT distance parameters are kilometers. They are converted using `Units_Get * Connect` and `Units_Convert` without changing session units; failed or malformed unit queries stop before configuration. String `out_of_date` / `time_filter` values remain `On`/`Off` or values in current Connect units. A nonzero `sample_step_size` is currently rejected without changes because STK requires both maximum and minimum step sizes; use `send_command` with both values in Connect time units.
+
+> Setup, prefilters, and assessment stop at the first rejected command, including TLE propagation. Earlier successful changes may remain; there is no automatic rollback. Supply both times and both lines of each requested TLE together. The primary must already exist; creating a missing secondary requires both secondary TLE lines. These paths have offline regression coverage, not live STK version-compatibility validation.
 
 </details>
 
@@ -978,7 +982,11 @@ claude mcp add stk -- stk-mcp
 
 > `acat_set_threat_volume` 暂不支持，会明确返回提示且不修改 STK 设置。尺寸和硬体半径需通过 STK 或 [ACAT 命令](https://help.agi.com/stk/Subsystems/connectCmds/Content/cmd_ACAT.htm)绑定到具体主/次对象，并核对 Connect 单位。
 
-> `assess` 是快捷路径：一次调用完成创建次对象、设 TLE、传播、建 AdvCAT、计算并返回事件。
+> `assess` 是快捷路径：一次调用完成创建次对象、设 TLE、传播、建 AdvCAT、计算并返回事件。每次创建独立的 `ConjunctionAssessment_<id>` 对象并返回名称，避免之前的卫星对混入本次结果；已有分析对象会保留。新分析使用 `New ... NoDefault`，不继承用户保存的对象默认配置。
+
+> CAT/ACAT 数值距离参数按公里输入，通过 `Units_Get * Connect` 和 `Units_Convert` 转换，不修改会话单位；单位查询或转换失败、返回格式异常时，在配置前停止。字符串 `out_of_date` / `time_filter` 仍使用 `On`/`Off` 或当前 Connect 单位。非零 `sample_step_size` 暂不支持且不修改设置，因为 STK 要求同时提供最大和最小步长；可通过 `send_command` 按 Connect 时间单位提供两者。
+
+> 配置、预筛选和评估在首个命令失败时停止，包括 TLE 传播失败。此前成功的修改可能保留，不自动回滚。起止时间和每组 TLE 两行必须成对提供。主卫星需已存在；创建不存在的次卫星需提供它的两行 TLE。相关验证为离线回归测试，尚未在真实 STK 中验证版本兼容性。
 
 </details>
 

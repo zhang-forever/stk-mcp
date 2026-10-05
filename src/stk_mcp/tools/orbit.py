@@ -19,9 +19,9 @@ def _get_state(ctx: Context):
     return ctx.request_context.lifespan_context
 
 
-async def _propagate_satellite(
+async def _propagate_satellite_result(
     ctx: Context, satellite_name: str, use_scenario_time: bool = True
-) -> str:
+) -> dict:
     """Propagate a satellite, using COM to set UseScenarioAnalysisTime if available."""
     state = _get_state(ctx)
     client = state.client
@@ -34,7 +34,13 @@ async def _propagate_satellite(
                 logger.info("COM: set UseScenarioAnalysisTime=True for %s", satellite_name)
         except Exception as e:
             logger.warning("COM UseScenarioAnalysisTime failed for %s: %s", satellite_name, e)
-    result = await client.send_command(f"Propagate */Satellite/{satellite_name}")
+    return await client.send_command(f"Propagate */Satellite/{satellite_name}")
+
+
+async def _propagate_satellite(
+    ctx: Context, satellite_name: str, use_scenario_time: bool = True
+) -> str:
+    result = await _propagate_satellite_result(ctx, satellite_name, use_scenario_time)
     if result["ack"] == "ACK":
         return f"Satellite '{satellite_name}' propagated"
     return f"Failed to propagate: {result}"
