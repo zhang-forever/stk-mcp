@@ -351,11 +351,13 @@ parameters. Expand each tool below for its full action/parameter table.
 | `acat_add_primary` | `object_path` | `acat_name` | Primary added |
 | `acat_add_secondary` | `secondary_path` **or** `database_path` | `acat_name` | Secondary added |
 | `acat_set_prefilters` | — | `out_of_date`, `apogee_perigee`, `orbit_path`, `time_filter` | Prefilters set |
-| `acat_set_threat_volume` | — | `dimension_type`, `tangential_km`, `cross_track_km`, `normal_km`, `hard_body_radius_m` | Threat volume set |
+| `acat_set_threat_volume` | — | `dimension_type`, `tangential_km`, `cross_track_km`, `normal_km`, `hard_body_radius_m` | Unsupported; no settings changed (see below) |
 | `acat_compute` | — | `acat_name` | Computation done |
 | `acat_events` | — | `acat_name`, `sort_by` | Conjunction events |
 | `acat_probability` | `primary_name`, `secondary_name`, `tca_time` | `method` (Alfano) | Collision probability (Pc) |
 | `assess` | `primary_satellite`, `secondary_satellite` | `tle_*_line1/2`, `start_time`, `stop_time`, `threshold_km` | End-to-end assessment |
+
+> `acat_set_threat_volume` currently returns an explicit unsupported result and changes no STK settings. Dimensions and hard-body radius must be bound to a primary/secondary object using STK or the [ACAT command](https://help.agi.com/stk/Subsystems/connectCmds/Content/cmd_ACAT.htm), with the appropriate Connect units.
 
 > `assess` is the fast path: creates the secondary, sets TLEs, propagates, builds AdvCAT,
 > computes, and returns events in a single call.
@@ -968,11 +970,13 @@ claude mcp add stk -- stk-mcp
 | `acat_add_primary` | `object_path` | `acat_name` | 主对象已添加 |
 | `acat_add_secondary` | `secondary_path` **或** `database_path` | `acat_name` | 次对象已添加 |
 | `acat_set_prefilters` | — | `out_of_date`, `apogee_perigee`, `orbit_path`, `time_filter` | 预筛选已设 |
-| `acat_set_threat_volume` | — | `dimension_type`, `tangential_km`, `cross_track_km`, `normal_km`, `hard_body_radius_m` | 威胁体积已设 |
+| `acat_set_threat_volume` | — | `dimension_type`, `tangential_km`, `cross_track_km`, `normal_km`, `hard_body_radius_m` | 暂不支持，不修改设置（见下文） |
 | `acat_compute` | — | `acat_name` | 计算完成 |
 | `acat_events` | — | `acat_name`, `sort_by` | 交会事件 |
 | `acat_probability` | `primary_name`, `secondary_name`, `tca_time` | `method`（Alfano） | 碰撞概率 (Pc) |
 | `assess` | `primary_satellite`, `secondary_satellite` | `tle_*_line1/2`, `start_time`, `stop_time`, `threshold_km` | 端到端评估 |
+
+> `acat_set_threat_volume` 暂不支持，会明确返回提示且不修改 STK 设置。尺寸和硬体半径需通过 STK 或 [ACAT 命令](https://help.agi.com/stk/Subsystems/connectCmds/Content/cmd_ACAT.htm)绑定到具体主/次对象，并核对 Connect 单位。
 
 > `assess` 是快捷路径：一次调用完成创建次对象、设 TLE、传播、建 AdvCAT、计算并返回事件。
 

@@ -3,9 +3,9 @@ STK Connect TCP Client.
 
 Implements the STK Connect socket protocol:
 1. Send command string + '\\n'
-2. With ACK on: read ACK (3 chars "ACK\\n") or NAK (4 chars "NAK\\n")
+2. With ACK on: read b"ACK" (3 bytes) or b"NACK" (4 bytes), no newline
 3. For return-data commands: read 40-byte header "COMMANDNAME  NUMBYTES\\n"
-4. Single-line: read NUMBYTES chars of data
+4. Single-line: read NUMBYTES bytes of data
 5. Multi-line: first read gives row count, then loop reading header+data per row
 """
 
@@ -191,13 +191,16 @@ class StkConnectClient:
         logger.info("Connected to STK at %s:%d", self.host, self.port)
 
         # Enable ACK (required for reliable command-response)
-        await self._send_raw("ConControl / AckOn")
-        # Read ACK response (no ACK for the AckOn command itself in some versions)
         try:
-            await self._read_ack(timeout=5.0)
-        except Exception:
-            # Some STK versions don't ACK the AckOn command itself
-            pass
+            await self._send_raw("ConControl / AckOn")
+            # Some STK versions send no reply to AckOn. Only a wholly absent
+            # reply is optional; a partial, malformed or rejected reply is not.
+            ack = await self._read_ack(timeout=5.0, allow_missing=True)
+            if ack == "NAK":
+                raise ConnectionError("STK rejected ACK mode")
+        except (Exception, asyncio.CancelledError):
+            self._abort_connection()
+            raise
 
     async def disconnect(self) -> None:
         """Close TCP connection gracefully."""
@@ -235,31 +238,48 @@ class StkConnectClient:
             if not self._connected:
                 raise ConnectionError("Not connected to STK")
 
-            # Send the command
-            await self._send_raw(command)
+            if not command.strip():
+                raise ValueError("Command must not be empty")
 
-            # Read ACK/NAK
-            ack = await self._read_ack(timeout=timeout)
+            try:
+                # Send the command
+                await self._send_raw(command)
 
-            result = {"ack": ack, "data": None, "raw": ""}
+                # Read ACK/NAK
+                ack = await self._read_ack(timeout=timeout)
 
-            if ack == "ACK":
-                # Check if this command returns data
-                cmd_name = command.strip().split()[0].upper()
-                ret_method = RETURN_DATA_COMMANDS.get(cmd_name)
+                result = {"ack": ack, "data": None, "raw": ""}
 
-                if ret_method == 1:
-                    # Single-line return
-                    data = await self._read_single_line(timeout=timeout)
-                    result["data"] = data
-                    result["raw"] = "\n".join(data) if data else ""
-                elif ret_method == 2:
-                    # Multi-line return
-                    data = await self._read_multi_line(timeout=timeout)
-                    result["data"] = data
-                    result["raw"] = "\n".join(data) if data else ""
+                if ack == "ACK":
+                    # Check if this command returns data
+                    cmd_name = command.strip().split()[0].upper()
+                    ret_method = RETURN_DATA_COMMANDS.get(cmd_name)
 
-            return result
+                    if ret_method == 1:
+                        # Single-line return
+                        data = await self._read_single_line(timeout=timeout)
+                        result["data"] = data
+                        result["raw"] = "\n".join(data) if data else ""
+                    elif ret_method == 2:
+                        # Multi-line return
+                        data = await self._read_multi_line(timeout=timeout)
+                        result["data"] = data
+                        result["raw"] = "\n".join(data) if data else ""
+
+                return result
+            except (Exception, asyncio.CancelledError):
+                # A late reply or a partially read frame cannot be associated
+                # safely with the next command. Reconnect rather than reuse it.
+                self._abort_connection()
+                raise
+
+    def _abort_connection(self) -> None:
+        """Discard an unusable stream without sending more protocol commands."""
+        self._connected = False
+        if self._writer:
+            self._writer.close()
+        self._reader = None
+        self._writer = None
 
     async def _send_raw(self, command: str) -> None:
         """Send raw command bytes."""
@@ -268,32 +288,35 @@ class StkConnectClient:
         self._writer.write((command + "\n").encode("utf-8"))
         await self._writer.drain()
 
-    async def _read_ack(self, timeout: float = 10.0) -> str:
-        """Read ACK or NAK response."""
+    async def _read_ack(
+        self, timeout: float = 10.0, *, allow_missing: bool = False
+    ) -> str | None:
+        """Read the complete wire token and normalize NACK to API value NAK."""
         if not self._reader:
             raise ConnectionError("Reader not initialized")
 
-        # Read first byte to determine ACK vs NAK
-        first_byte = await asyncio.wait_for(
-            self._reader.read(1), timeout=timeout
-        )
-        if not first_byte:
-            raise ConnectionError("Connection closed by STK")
-
-        first_char = first_byte.decode("utf-8")
-
-        if first_char == "N":
-            # NAK: read remaining 3 chars ("AK\n")
-            rest = await asyncio.wait_for(
-                self._reader.read(3), timeout=timeout
+        try:
+            first = await asyncio.wait_for(
+                self._reader.readexactly(1), timeout=timeout
             )
-            return "NAK"
-        else:
-            # ACK: read remaining 2 chars ("CK\n") or ("CK\r\n")
-            rest = await asyncio.wait_for(
-                self._reader.read(2), timeout=timeout
+        except asyncio.TimeoutError:
+            if allow_missing:
+                return None
+            raise
+
+        if first == b"A":
+            tail = await asyncio.wait_for(
+                self._reader.readexactly(2), timeout=timeout
             )
-            return "ACK"
+            if tail == b"CK":
+                return "ACK"
+        elif first == b"N":
+            tail = await asyncio.wait_for(
+                self._reader.readexactly(3), timeout=timeout
+            )
+            if tail == b"ACK":
+                return "NAK"
+        raise ValueError("Invalid STK ACK/NACK response")
 
     async def _read_header(
         self, timeout: float = 30.0
@@ -309,17 +332,12 @@ class StkConnectClient:
 
         # Parse: "COMMANDNAME    NUMBYTES"
         parts = header_text.split()
-        if len(parts) >= 2:
-            cmd_name = parts[0]
-            try:
-                num_bytes = int(parts[1])
-            except ValueError:
-                num_bytes = 0
-            return cmd_name, num_bytes
-        elif len(parts) == 1:
-            return parts[0], 0
-        else:
-            return "", 0
+        if len(parts) != 2:
+            raise ValueError(f"Invalid STK return header: {header_text!r}")
+        cmd_name, count = parts
+        if not count.isascii() or not count.isdecimal():
+            raise ValueError(f"Invalid STK byte count: {count!r}")
+        return cmd_name, int(count)
 
     async def _read_single_line(
         self, timeout: float = 30.0
@@ -350,11 +368,10 @@ class StkConnectClient:
         raw_count = await asyncio.wait_for(
             self._reader.readexactly(num_bytes), timeout=timeout
         )
-        try:
-            num_rows = int(raw_count.decode("utf-8").strip())
-        except ValueError:
-            # If parsing fails, the first read might be actual data
-            return [raw_count.decode("utf-8").strip()]
+        count = raw_count.decode("utf-8").strip()
+        if not count.isascii() or not count.isdecimal():
+            raise ValueError(f"Invalid STK row count: {count!r}")
+        num_rows = int(count)
 
         lines: list[str] = []
         for _ in range(num_rows):

@@ -69,7 +69,7 @@ async def stk_conjunction(
         acat_add_primary      — Add primary (protected) object. Params: object_path, acat_name
         acat_add_secondary    — Add secondary (threat) object. Params: object_path or database_path, acat_name
         acat_set_prefilters   — Set pre-computation filters. Params: acat_name, out_of_date, apogee_perigee, orbit_path, time_filter
-        acat_set_threat_volume — Configure threat volume ellipsoid. Params: acat_name, dimension_type, tangential_km, cross_track_km, normal_km, hard_body_radius_m
+        acat_set_threat_volume — Unsupported; returns guidance without changing STK. Params: acat_name, dimension_type, tangential_km, cross_track_km, normal_km, hard_body_radius_m
         acat_compute           — Run Advanced CAT. Params: acat_name
         acat_events            — Get conjunction events. Params: acat_name, sort_by
         acat_probability       — Compute Pc for a pair. Params: acat_name, primary_name, secondary_name, tca_time, method
@@ -221,17 +221,16 @@ async def stk_conjunction(
 
     # ── acat_set_threat_volume ───────────────────────────────
     elif action == "acat_set_threat_volume":
-        results = [f"Dimension type: {dimension_type}"]
-        r = await client.send_command(
-            f"ACAT */AdvCAT/{acat_name} ScaleFactor 1.0"
+        # Dimensions and hard-body radius are per-object ACAT Primary/Secondary
+        # Add parameters. ScaleFactor does not apply these requested values.
+        return (
+            "Unsupported action: acat_set_threat_volume does not configure "
+            "dimensions or hard-body radius; no STK settings were changed. "
+            "Configure the intended primary/secondary object's threat volume "
+            "in STK, or use send_command with the ACAT Primary/Secondary Add "
+            "parameters appropriate to your STK version and Connect units. "
+            "See https://help.agi.com/stk/Subsystems/connectCmds/Content/cmd_ACAT.htm"
         )
-        results.append(
-            f"Fixed threat volume: {tangential_km}x{cross_track_km}x{normal_km} km"
-        )
-        if hard_body_radius_m > 0:
-            results.append(f"Hard body radius: {hard_body_radius_m} m")
-        results.append("(Use send_command for precise .foc/.qdb database config)")
-        return "\n".join(results)
 
     # ── acat_compute ─────────────────────────────────────────
     elif action == "acat_compute":
@@ -334,8 +333,10 @@ async def stk_conjunction(
         if ev["ack"] == "ACK" and ev["data"]:
             steps.append(f"\nEvents ({len(ev['data'])} events):")
             steps.append("\n".join(ev["data"]))
-        else:
+        elif ev["ack"] == "ACK":
             steps.append("No conjunction events found")
+        else:
+            return "Event retrieval failed:\n" + "\n".join(steps) + f"\nError: {ev}"
 
         return "\n".join(steps)
 
