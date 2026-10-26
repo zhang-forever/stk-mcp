@@ -5,6 +5,12 @@ from __future__ import annotations
 from mcp.server.fastmcp import Context
 
 from stk_mcp.app import mcp
+from stk_mcp.validation import (
+    CommandValidationError,
+    validate_name,
+    validate_object_ref,
+    validate_path,
+)
 
 
 def _get_client(ctx: Context):
@@ -46,6 +52,27 @@ async def stk_analysis(
         radar           — Radar analysis query. Params: object_path
     """
     client = _get_client(ctx)
+
+    # Reject values that cannot be a single Connect token before they are
+    # interpolated into a command (defense in depth; the client also rejects
+    # control characters in the final command string).
+    try:
+        if from_object:
+            from_object = validate_object_ref(from_object, "from_object")
+        if to_object:
+            to_object = validate_object_ref(to_object, "to_object")
+        if chain_name:
+            chain_name = validate_name(chain_name, "chain_name")
+        if coverage_name:
+            coverage_name = validate_name(coverage_name, "coverage_name")
+        if comm_system:
+            comm_system = validate_name(comm_system, "comm_system")
+        if sensor_path:
+            sensor_path = validate_path(sensor_path, "sensor_path")
+        if object_path:
+            object_path = validate_path(object_path, "object_path")
+    except CommandValidationError as exc:
+        return f"Invalid input: {exc}"
 
     # ── access ───────────────────────────────────────────────
     if action == "access":
@@ -158,9 +185,7 @@ async def stk_analysis(
     elif action == "visibility":
         if not from_object or not to_object:
             return "Parameters 'from_object' and 'to_object' are required"
-        r = await client.send_command(
-            f"Visibility_RM */{from_object} */{to_object}"
-        )
+        r = await client.send_command(f"Visibility_RM */{from_object} */{to_object}")
         if r["ack"] == "ACK" and r["data"]:
             return f"Visibility {from_object} → {to_object}:\n" + "\n".join(r["data"])
         elif r["ack"] == "ACK":

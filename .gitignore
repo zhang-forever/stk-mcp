@@ -37,3 +37,4 @@ skill/
 
 # Internal development instructions — not for public repo
 CLAUDE.md
+.coverage

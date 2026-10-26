@@ -74,9 +74,7 @@ async def stk_scenario(
             r = await client.send_command("CheckScenario /")
             if r["ack"] == "ACK" and r["data"]:
                 loaded = r["raw"].strip() == "1"
-                lines.append(
-                    "Scenario: loaded" if loaded else "Scenario: None loaded"
-                )
+                lines.append("Scenario: loaded" if loaded else "Scenario: None loaded")
             else:
                 lines.append("Scenario: None loaded")
         except Exception as e:
@@ -91,9 +89,7 @@ async def stk_scenario(
         if r["ack"] != "ACK":
             return f"Failed to create scenario: {r}"
         if start_time and stop_time:
-            tp = await client.send_command(
-                f'SetTimePeriod * "{start_time}" "{stop_time}"'
-            )
+            tp = await client.send_command(f'SetTimePeriod * "{start_time}" "{stop_time}"')
             if tp["ack"] != "ACK":
                 return f"Scenario created but time period failed: {tp}"
         await client.send_command("Animate * Reset")
@@ -117,7 +113,7 @@ async def stk_scenario(
             cmd += f' "{file_path}"'
         r = await client.send_command(cmd)
         if r["ack"] == "ACK":
-            return f"Scenario saved" + (f" to {file_path}" if file_path else "")
+            return "Scenario saved" + (f" to {file_path}" if file_path else "")
         return f"Failed to save scenario: {r}"
 
     # ── unload ───────────────────────────────────────────────
@@ -131,9 +127,7 @@ async def stk_scenario(
     elif action == "set_time_period":
         if not start_time or not stop_time:
             return "Parameters 'start_time' and 'stop_time' are required"
-        r = await client.send_command(
-            f'SetTimePeriod * "{start_time}" "{stop_time}"'
-        )
+        r = await client.send_command(f'SetTimePeriod * "{start_time}" "{stop_time}"')
         if r["ack"] == "ACK":
             return f"Time period set: {start_time} to {stop_time}"
         return f"Failed to set time period: {r}"
