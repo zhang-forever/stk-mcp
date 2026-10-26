@@ -9,15 +9,24 @@ from stk_mcp.tools.cat import stk_conjunction
 
 
 def _context(client):
-    return SimpleNamespace(request_context=SimpleNamespace(
-        lifespan_context=SimpleNamespace(client=client)
-    ))
+    return SimpleNamespace(
+        request_context=SimpleNamespace(lifespan_context=SimpleNamespace(client=client))
+    )
 
 
-@pytest.mark.parametrize("params", [{}, {
-    "dimension_type": "Fixed", "tangential_km": 3,
-    "cross_track_km": 2, "normal_km": 1, "hard_body_radius_m": 10,
-}])
+@pytest.mark.parametrize(
+    "params",
+    [
+        {},
+        {
+            "dimension_type": "Fixed",
+            "tangential_km": 3,
+            "cross_track_km": 2,
+            "normal_km": 1,
+            "hard_body_radius_m": 10,
+        },
+    ],
+)
 @pytest.mark.asyncio
 async def test_unsupported_threat_volume_never_mutates_stk(params):
     client = SimpleNamespace(send_command=AsyncMock())
@@ -27,10 +36,13 @@ async def test_unsupported_threat_volume_never_mutates_stk(params):
     client.send_command.assert_not_awaited()
 
 
-@pytest.mark.parametrize("ack,expected", [
-    ("NAK", "Event retrieval failed"),
-    ("ACK", "No conjunction events found"),
-])
+@pytest.mark.parametrize(
+    "ack,expected",
+    [
+        ("NAK", "Event retrieval failed"),
+        ("ACK", "No conjunction events found"),
+    ],
+)
 @pytest.mark.asyncio
 async def test_assess_distinguishes_failed_event_query_from_no_events(ack, expected):
     async def send(command):
@@ -43,9 +55,11 @@ async def test_assess_distinguishes_failed_event_query_from_no_events(ack, expec
         if command.startswith("DoesObjExist"):
             return {"ack": "ACK", "data": ["1"], "raw": "1"}
         return {"ack": "ACK", "data": None, "raw": ""}
+
     client = SimpleNamespace(send_command=AsyncMock(side_effect=send))
-    result = await stk_conjunction(_context(client), "assess",
-                                   primary_satellite="Primary", secondary_satellite="Secondary")
+    result = await stk_conjunction(
+        _context(client), "assess", primary_satellite="Primary", secondary_satellite="Secondary"
+    )
     assert expected in result
     if ack == "NAK":
         assert "No conjunction events found" not in result

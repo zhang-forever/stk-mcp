@@ -2,11 +2,11 @@
 
 # Import all tool modules to trigger @mcp.tool() registration
 from stk_mcp.tools import (
-    scenario,
+    analysis,
+    cat,
     objects,
     orbit,
-    cat,
-    analysis,
+    scenario,
     util,
 )
 
