@@ -15,6 +15,7 @@ from stk_mcp.validation import (  # noqa: E402
     raw_command_allowed,
     validate_command,
     validate_name,
+    validate_object_ref,
     validate_path,
     validate_raw_command,
 )
@@ -130,3 +131,55 @@ def test_client_rejects_injected_command_before_sending() -> None:
 
     with pytest.raises(CommandValidationError):
         asyncio.run(client.send_command("Access A\nDelete */Satellite/B"))
+
+
+@pytest.mark.parametrize(
+    "ref",
+    ["Sat1", "Satellite/ISS", "Facility/GroundStation", "*/Satellite/ISS"],
+)
+def test_validate_object_ref_accepts_names_and_relative_paths(ref: str) -> None:
+    """README examples use relative paths such as Satellite/ISS in access calls."""
+    assert validate_object_ref(ref) == ref
+
+
+@pytest.mark.parametrize("ref", ["", "Sat 1", "Satellite/../x", "Satellite/ISS\nDelete *"])
+def test_validate_object_ref_rejects_bad_refs(ref: str) -> None:
+    with pytest.raises(CommandValidationError):
+        validate_object_ref(ref)
+
+
+def test_analysis_access_accepts_relative_path_arguments(monkeypatch) -> None:
+    """Regression: from_object/to_object must keep working with Satellite/ISS."""
+    import asyncio
+
+    from stk_mcp.tools import analysis as analysis_tool
+
+    seen: list[str] = []
+
+    class _Client:
+        async def send_command(self, command: str, timeout: float = 120.0):
+            seen.append(command)
+            return {"ack": "ACK", "data": ["ok"], "raw": "ok"}
+
+    class _Ctx:
+        class request_context:
+            class lifespan_context:
+                client = _Client()
+
+    out = asyncio.run(
+        analysis_tool.stk_analysis.__wrapped__(  # type: ignore[attr-defined]
+            _Ctx(),
+            action="access",
+            from_object="Satellite/ISS",
+            to_object="Facility/GroundStation",
+        )
+        if hasattr(analysis_tool.stk_analysis, "__wrapped__")
+        else analysis_tool.stk_analysis(
+            _Ctx(),
+            action="access",
+            from_object="Satellite/ISS",
+            to_object="Facility/GroundStation",
+        )
+    )
+    assert "Invalid input" not in out
+    assert seen and seen[0].startswith("Access */Satellite/ISS */Facility/GroundStation")

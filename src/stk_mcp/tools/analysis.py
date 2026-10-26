@@ -5,7 +5,12 @@ from __future__ import annotations
 from mcp.server.fastmcp import Context
 
 from stk_mcp.app import mcp
-from stk_mcp.validation import CommandValidationError, validate_name, validate_path
+from stk_mcp.validation import (
+    CommandValidationError,
+    validate_name,
+    validate_object_ref,
+    validate_path,
+)
 
 
 def _get_client(ctx: Context):
@@ -53,9 +58,9 @@ async def stk_analysis(
     # control characters in the final command string).
     try:
         if from_object:
-            from_object = validate_name(from_object, "from_object")
+            from_object = validate_object_ref(from_object, "from_object")
         if to_object:
-            to_object = validate_name(to_object, "to_object")
+            to_object = validate_object_ref(to_object, "to_object")
         if chain_name:
             chain_name = validate_name(chain_name, "chain_name")
         if coverage_name:

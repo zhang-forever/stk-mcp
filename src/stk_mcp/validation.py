@@ -79,6 +79,19 @@ def validate_path(value: object, field: str = "path") -> str:
     return path
 
 
+def validate_object_ref(value: object, field: str = "object") -> str:
+    """Validate an object reference that may be a bare name or a relative path.
+
+    ``stk_analysis`` builds commands like ``Access */<ref>``, so callers pass
+    either ``Sat1`` or ``Satellite/Sat1``.  Both are accepted here; anything
+    with whitespace, control characters or dot segments is rejected.
+    """
+    ref = _require_str(value, field)
+    if _NAME_RE.match(ref):
+        return ref
+    return validate_path(ref, field)
+
+
 def validate_number(value: object, field: str = "number") -> int | float:
     """Return *value* if it is a finite number, else raise."""
     if isinstance(value, bool) or not isinstance(value, (int, float)):
