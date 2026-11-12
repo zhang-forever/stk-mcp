@@ -9,6 +9,7 @@ from stk_mcp.app import _env_int
 from stk_mcp.connect_client import StkConnectClient
 from stk_mcp.tools._common import StkCommandError, send_checked
 from stk_mcp.tools.objects import stk_objects
+from stk_mcp.tools.util import stk_util
 from stk_mcp.validation import CommandValidationError, validate_command
 
 
@@ -92,3 +93,38 @@ async def test_add_facility_reports_position_failure():
         altitude=0.0,
     )
     assert "position was not set" in result
+
+
+class UnitClient:
+    def __init__(self, data="1000"):
+        self.commands = []
+        self.data = data
+
+    async def send_command(self, command):
+        self.commands.append(command)
+        return {"ack": "ACK", "data": [self.data], "raw": self.data}
+
+
+@pytest.mark.asyncio
+async def test_convert_unit_uses_units_convert():
+    client = UnitClient()
+    result = await stk_util(context(client), "convert_unit", from_unit="km", to_unit="m", value=1.0)
+    assert client.commands[-1] == 'Units_Convert * Unit Distance "km" "m" "1.0"'
+    assert "1000" in result
+
+
+@pytest.mark.asyncio
+async def test_convert_unit_rejects_mixed_dimensions():
+    client = UnitClient()
+    result = await stk_util(
+        context(client), "convert_unit", from_unit="km", to_unit="sec", value=1.0
+    )
+    assert "different dimensions" in result
+    assert client.commands == []
+
+
+@pytest.mark.asyncio
+async def test_convert_unit_falls_back_for_unknown_units():
+    client = UnitClient()
+    await stk_util(context(client), "convert_unit", from_unit="furlong", to_unit="m", value=1.0)
+    assert client.commands[-1] == "ConvertUnit furlong m 1.0"

@@ -8,6 +8,108 @@ from stk_mcp.app import mcp
 from stk_mcp.tools._common import get_client
 from stk_mcp.validation import CommandValidationError, validate_raw_command
 
+# Common STK unit names and abbreviations mapped to their Connect dimension.
+# Units_Convert requires the dimension; unknown units fall back to the
+# deprecated ConvertUnit command, which infers it from the unit pair.
+_UNIT_DIMENSIONS: dict[str, str] = {
+    # Distance
+    "m": "Distance",
+    "meter": "Distance",
+    "meters": "Distance",
+    "km": "Distance",
+    "kilometer": "Distance",
+    "kilometers": "Distance",
+    "cm": "Distance",
+    "centimeter": "Distance",
+    "centimeters": "Distance",
+    "mm": "Distance",
+    "millimeter": "Distance",
+    "millimeters": "Distance",
+    "ft": "Distance",
+    "foot": "Distance",
+    "feet": "Distance",
+    "mi": "Distance",
+    "mile": "Distance",
+    "miles": "Distance",
+    "nmi": "Distance",
+    "nauticalmile": "Distance",
+    "nauticalmiles": "Distance",
+    "in": "Distance",
+    "inch": "Distance",
+    "inches": "Distance",
+    "kilofeet": "Distance",
+    # Time
+    "sec": "Time",
+    "second": "Time",
+    "seconds": "Time",
+    "min": "Time",
+    "minute": "Time",
+    "minutes": "Time",
+    "hr": "Time",
+    "hour": "Time",
+    "hours": "Time",
+    "day": "Time",
+    "days": "Time",
+    # Angle
+    "deg": "Angle",
+    "degree": "Angle",
+    "degrees": "Angle",
+    "rad": "Angle",
+    "radian": "Angle",
+    "radians": "Angle",
+    "arcsec": "Angle",
+    "arcsecond": "Angle",
+    "arcseconds": "Angle",
+    "arcmin": "Angle",
+    "arcminute": "Angle",
+    "arcminutes": "Angle",
+    # Velocity
+    "m/sec": "Velocity",
+    "m/s": "Velocity",
+    "km/sec": "Velocity",
+    "km/s": "Velocity",
+    "km/hr": "Velocity",
+    "km/h": "Velocity",
+    "mph": "Velocity",
+    # Mass
+    "kg": "Mass",
+    "kilogram": "Mass",
+    "kilograms": "Mass",
+    "g": "Mass",
+    "gram": "Mass",
+    "grams": "Mass",
+    "lb": "Mass",
+    "pound": "Mass",
+    "pounds": "Mass",
+    # Temperature
+    "k": "Temperature",
+    "kelvin": "Temperature",
+    "c": "Temperature",
+    "celsius": "Temperature",
+    "f": "Temperature",
+    "fahrenheit": "Temperature",
+    # Frequency
+    "hz": "Frequency",
+    "hertz": "Frequency",
+    "khz": "Frequency",
+    "mhz": "Frequency",
+    "ghz": "Frequency",
+}
+
+
+def _unit_dimension(from_unit: str, to_unit: str) -> tuple[str | None, str]:
+    """Return the shared dimension, or an error message when they conflict."""
+    source = _UNIT_DIMENSIONS.get(from_unit.strip().lower())
+    target = _UNIT_DIMENSIONS.get(to_unit.strip().lower())
+    if source and target:
+        if source != target:
+            return None, (
+                f"Units '{from_unit}' and '{to_unit}' belong to different "
+                f"dimensions ({source}, {target})"
+            )
+        return source, ""
+    return None, ""
+
 
 @mcp.tool()
 async def stk_util(
@@ -131,8 +233,14 @@ async def stk_util(
     # ── convert_unit ─────────────────────────────────────────
     elif action == "convert_unit":
         if not from_unit or not to_unit:
-            return "Parameters 'from_unit', 'to_unit', and 'value' are required"
-        cmd = f"ConvertUnit {from_unit} {to_unit} {value}"
+            return "Parameters 'from_unit' and 'to_unit' are required"
+        dimension, error = _unit_dimension(from_unit, to_unit)
+        if error:
+            return error
+        if dimension:
+            cmd = f'Units_Convert * Unit {dimension} "{from_unit}" "{to_unit}" "{value}"'
+        else:
+            cmd = f"ConvertUnit {from_unit} {to_unit} {value}"
         r = await client.send_command(cmd)
         if r["ack"] == "ACK" and r["data"]:
             return f"Unit conversion: {value} {from_unit} = {r['raw']} {to_unit}"

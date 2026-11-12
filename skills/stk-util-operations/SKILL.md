@@ -48,8 +48,10 @@ stk_util convert_coord from_coord="J2000" to_coord="Fixed" coord_values="7000,0,
 stk_util convert_date date_string="1 Jul 2026 12:00:00" date_format="UTCG"
 ```
 
-`convert_unit` currently issues STK's deprecated `ConvertUnit` command. If it
-returns `NAK` on a newer STK build, use the supported replacement:
+`convert_unit` uses the supported `Units_Convert` command when both units are
+recognized (common distance, time, angle, velocity, mass, temperature, and
+frequency units). Unknown unit pairs fall back to STK's deprecated `ConvertUnit`;
+if that returns `NAK`, use the raw command:
 
 ```
 stk_util send_command command='Units_Convert * Unit Distance km "m" 7000'
