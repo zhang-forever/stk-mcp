@@ -207,9 +207,12 @@ class StkConnectClient:
             # reply is optional; a partial, malformed or rejected reply is not.
             ack = await self._read_ack(timeout=5.0, allow_missing=True)
             if ack is None:
-                # A late reply would otherwise be consumed as the next
-                # command's ACK. Drain anything that arrived meanwhile.
-                await self._discard_pending_input()
+                # Some STK builds reply slightly after the optional window.
+                # Parse a complete token instead of discarding raw bytes: a
+                # fragmented reply must not desynchronize the next command.
+                late = await self._read_ack(timeout=0.5, allow_missing=True)
+                if late == "NAK":
+                    raise ConnectionError("STK rejected ACK mode")
             elif ack == "NAK":
                 raise ConnectionError("STK rejected ACK mode")
         except (Exception, asyncio.CancelledError):
@@ -295,15 +298,6 @@ class StkConnectClient:
             self._writer.close()
         self._reader = None
         self._writer = None
-
-    async def _discard_pending_input(self, timeout: float = 0.05) -> None:
-        """Best-effort drain of a late optional reply."""
-        if not self._reader:
-            return
-        try:
-            await asyncio.wait_for(self._reader.read(64), timeout=timeout)
-        except Exception:
-            pass
 
     async def _send_raw(self, command: str) -> None:
         """Send raw command bytes."""

@@ -1,5 +1,6 @@
 """Regression tests for input validation and checked command dispatch."""
 
+import asyncio
 from types import SimpleNamespace
 
 import pytest
@@ -45,6 +46,26 @@ async def test_send_command_rejects_newlines():
     client = StkConnectClient()
     with pytest.raises(ValueError, match="single line"):
         await client.send_command("New / */Satellite A\nQuit")
+
+
+@pytest.mark.asyncio
+async def test_read_ack_parses_fragmented_reply():
+    reader = asyncio.StreamReader()
+    reader.feed_data(b"A")
+    await asyncio.sleep(0)
+    reader.feed_data(b"CK")
+    client = StkConnectClient()
+    client._reader = reader
+    assert await client._read_ack(timeout=1.0) == "ACK"
+
+
+@pytest.mark.asyncio
+async def test_read_ack_normalizes_nack():
+    reader = asyncio.StreamReader()
+    reader.feed_data(b"NACK")
+    client = StkConnectClient()
+    client._reader = reader
+    assert await client._read_ack(timeout=1.0) == "NAK"
 
 
 def test_env_int_falls_back(monkeypatch):
