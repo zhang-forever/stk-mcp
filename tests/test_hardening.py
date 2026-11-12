@@ -9,6 +9,7 @@ from stk_mcp.app import _env_int
 from stk_mcp.connect_client import StkConnectClient
 from stk_mcp.tools._common import StkCommandError, send_checked
 from stk_mcp.tools.objects import stk_objects
+from stk_mcp.validation import CommandValidationError, validate_command
 
 
 class FakeClient:
@@ -41,11 +42,9 @@ async def test_send_checked_raises_on_nak():
         await send_checked(FakeClient(ack="NAK"), "New / */Satellite Test")
 
 
-@pytest.mark.asyncio
-async def test_send_command_rejects_newlines():
-    client = StkConnectClient()
-    with pytest.raises(ValueError, match="single line"):
-        await client.send_command("New / */Satellite A\nQuit")
+def test_validate_command_rejects_newlines():
+    with pytest.raises(CommandValidationError):
+        validate_command("New / */Satellite A\nQuit")
 
 
 @pytest.mark.asyncio
