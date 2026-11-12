@@ -10,6 +10,13 @@ build/
 .eggs/
 *.egg
 
+# Test and type-check caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
 # IDE
 .vscode/
 .idea/
@@ -33,7 +40,6 @@ desktop.ini
 .env
 *.log
 _test_*.py
-skill/
 
 # Internal development instructions — not for public repo
 CLAUDE.md

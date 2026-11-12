@@ -22,7 +22,7 @@ An MCP (Model Context Protocol) server that bridges AI agents with [AGI STK](htt
 
 ### Why STK + MCP?
 
-STK is the gold standard for space mission analysis, but driving it programmatically requires deep domain knowledge and manual scripting. This server exposes STK's full 1100+ command library through 6 structured MCP tools, letting any AI agent (Claude, GPT, Gemini, etc.) perform complex orbital mechanics, collision screening, and visibility analysis via simple function calls.
+STK is the reference platform for space mission analysis, but driving it programmatically takes deep domain knowledge and hand-written scripts. This server packages 58 common operations into six structured MCP tools and keeps a raw passthrough for STK's 1100+ Connect commands, so an AI agent (Claude, GPT, Gemini, and others) can run orbital mechanics, collision screening, and visibility analysis through simple function calls.
 
 ### Features
 
@@ -32,30 +32,30 @@ STK is the gold standard for space mission analysis, but driving it programmatic
 - **Orbit definition** — TLE (SGP4), Keplerian elements, Cartesian vectors, ephemeris files, position queries, lifetime estimation
 - **Conjunction assessment** — CAT close-approach screening + ACAT advanced collision probability (Pc) analysis
 - **Analysis suite** — access/visibility windows, AER data, coverage footprints, comm link budgets, sensor FOV, radar cross-section, lighting conditions
-- **Hybrid Connect + COM** — COM fallback (`pywin32`) fixes the `UseScenarioAnalysisTime` propagation limitation
+- **Connect + COM** — optional COM assist (`pywin32`) sets `UseScenarioAnalysisTime`, which Connect cannot
 - **Raw command passthrough** — send any of STK's 1100+ Connect commands directly
 
 ### Quick Start
 
-**One-click install (recommended):**
+**Installer script (recommended):**
 
 ```powershell
 # Windows (PowerShell) — installs with COM support
 git clone https://github.com/zhang-forever/stk-mcp.git
 cd stk-mcp
-powershell -ExecutionPolicy Bypass -File install.ps1
+powershell -ExecutionPolicy Bypass -File scripts/install.ps1
 ```
 
 ```bash
 # Linux / macOS — Connect TCP only (COM is Windows-only)
 git clone https://github.com/zhang-forever/stk-mcp.git
 cd stk-mcp
-./install.sh
+./scripts/install.sh
 ```
 
-The installer verifies prerequisites, installs dependencies (via `uv` if
-available, otherwise `pip`), creates `.env`, checks that all 6 tools register,
-and prints the client-configuration snippet.
+The installer checks prerequisites, installs dependencies (via `uv` when
+available, otherwise `pip`), creates `.env`, prints the number of registered
+tools, and shows the client-configuration snippet.
 
 **Manual install:**
 
@@ -139,10 +139,12 @@ Or manually create `.mcp.json` in your project root:
 }
 ```
 
-> **Bundled skills**: this repo ships `.claude/skills/` with guided workflows
-> (Walker constellation, coverage & visibility, conjunction assessment, scenario
-> scaffold, and **analysis report formatting**). Open the project in Claude Code
-> and they load automatically.
+> **Bundled skills**: this repo ships `skills/` with agent-agnostic guided
+> workflows for scenario setup, orbit definition, object management, Walker
+> constellations, coverage & visibility, access/RF analysis, conjunction
+> assessment, reports, and **analysis report formatting**. Point any agent
+> (Claude Code, Codex, Cursor, etc.) at the matching `SKILL.md`. Claude Code can
+> auto-discover them by copying or linking `skills/` to `.claude/skills/`.
 
 </details>
 
@@ -510,7 +512,7 @@ stk_analysis(action="aer",
 
 ### Result Reports
 
-The bundled **`stk-report`** skill (`.claude/skills/stk-report/`) formats raw STK output
+The bundled **`stk-report`** skill (`skills/stk-report/`) formats raw STK output
 into structured, risk-rated reports. After any analysis, the agent produces a report with:
 
 - **Header** — scenario name, time window, objects involved
@@ -572,8 +574,8 @@ Example conjunction report:
 
 **Dual-protocol design:**
 
-- **Connect TCP** (primary): Object creation, orbit setting, ACAT computation, reports — fast, covers 1100+ commands
-- **COM** (supplementary): Fixes the `UseScenarioAnalysisTime` property that Connect cannot set, ensuring full-scenario orbit propagation
+- **Connect TCP** (primary): object creation, orbit setup, ACAT computation, and reports; the raw passthrough reaches all 1100+ Connect commands
+- **COM** (supplementary): sets the `UseScenarioAnalysisTime` property that Connect cannot, so propagation spans the full scenario
 
 ### Connect Protocol Reference
 
@@ -593,9 +595,13 @@ Full command reference: *STK Help → Programming → Connect Command Library*.
 
 ```
 stk-mcp/
+├── AGENTS.md                   # Agent instructions (Codex, Claude Code, etc.)
 ├── pyproject.toml              # Package config (hatchling build)
-├── install.ps1                 # One-click installer (Windows)
-├── install.sh                  # One-click installer (Linux/macOS)
+├── scripts/
+│   ├── install.ps1             # Installer script (Windows)
+│   └── install.sh              # Installer script (Linux/macOS)
+├── examples/
+│   └── mcp.json.example        # MCP client configuration template
 ├── src/stk_mcp/
 │   ├── app.py                  # FastMCP instance + lifespan
 │   ├── server.py               # Entry point, tool registration
@@ -609,16 +615,22 @@ stk-mcp/
 │       ├── cat.py              # stk_conjunction (11 actions)
 │       ├── analysis.py         # stk_analysis (10 actions)
 │       └── util.py             # stk_util (8 actions)
-├── .claude/skills/             # Bundled Claude Code skills
+├── skills/                     # Agent-agnostic skill guides
 │   ├── stk-scenario-scaffold/  # Scenario setup workflow
+│   ├── stk-orbit-setup/        # Orbit definition, propagation, lifetime
+│   ├── stk-object-management/  # Facilities, sensors, chains, constellations
 │   ├── stk-walker-constellation/ # Walker constellation build
 │   ├── stk-coverage-visibility/  # Coverage & visibility analysis
+│   ├── stk-access-rf-analysis/ # Access, AER, link and sensor queries
 │   ├── stk-conjunction/        # Conjunction assessment workflow
+│   ├── stk-util-operations/    # Reports, conversions, raw commands
 │   └── stk-report/             # Analysis report formatting
 └── tests/
-    ├── mock_stk_server.py      # Mock STK Connect server for offline tests
-    ├── test_connect_protocol.py # Offline protocol tests (no STK required)
-    └── test_com.py             # COM interface integration test
+    ├── mock_stk_server.py        # Mock STK Connect server for offline tests
+    ├── test_connect_protocol.py  # Offline protocol tests (no STK required)
+    ├── test_connect_framing.py   # Framing and error-recovery tests
+    ├── test_conjunction_*.py     # Conjunction validation and workflow tests
+    └── test_com.py               # COM integration test (skipped without STK)
 ```
 
 ### Known Limitations
@@ -686,7 +698,7 @@ Validation lives in `src/stk_mcp/validation.py` and is enforced both in the tool
 
 ### 为什么选择 STK + MCP？
 
-STK 是航天任务分析的黄金标准，但编程驱动它需要深厚的领域知识和大量手工脚本。本项目将 STK 的 1100+ 命令库封装为 6 个结构化 MCP 工具，让任何 AI Agent（Claude、GPT、Gemini 等）通过简单的函数调用完成复杂轨道力学、碰撞筛查和可见性分析。
+STK 是航天任务分析的参考平台，但用程序驱动它需要深厚的领域知识和大量手工脚本。本项目把 58 个常用操作整理成 6 个结构化 MCP 工具，并保留原始命令透传以覆盖 STK 的 1100+ 条 Connect 命令；任何 AI Agent（Claude、GPT、Gemini 等）都能通过简单的函数调用完成轨道力学、碰撞筛查和可见性分析。
 
 ### 功能特性
 
@@ -696,29 +708,29 @@ STK 是航天任务分析的黄金标准，但编程驱动它需要深厚的领�
 - **轨道定义** — TLE (SGP4)、经典轨道根数、笛卡尔向量、星历文件、位置查询、寿命估算
 - **碰撞预警** — CAT 近距离筛查 + ACAT 高级碰撞概率 (Pc) 分析
 - **分析套件** — 可见性窗口、AER 数据、覆盖足迹、通信链路预算、传感器视场、雷达截面、光照条件
-- **Connect + COM 混合架构** — COM 辅助 (`pywin32`) 修复 `UseScenarioAnalysisTime` 传播窗口限制
+- **Connect + COM** — 可选 COM 辅助 (`pywin32`)，设置 Connect 无法写入的 `UseScenarioAnalysisTime`
 - **原始命令透传** — 直接发送 STK 的 1100+ Connect 命令
 
 ### 快速开始
 
-**一键安装（推荐）：**
+**安装脚本（推荐）：**
 
 ```powershell
 # Windows (PowerShell) — 含 COM 支持
 git clone https://github.com/zhang-forever/stk-mcp.git
 cd stk-mcp
-powershell -ExecutionPolicy Bypass -File install.ps1
+powershell -ExecutionPolicy Bypass -File scripts/install.ps1
 ```
 
 ```bash
 # Linux / macOS — 仅 Connect TCP（COM 仅限 Windows）
 git clone https://github.com/zhang-forever/stk-mcp.git
 cd stk-mcp
-./install.sh
+./scripts/install.sh
 ```
 
-安装脚本会自动检查环境、安装依赖（优先用 `uv`，否则回退 `pip`）、创建 `.env`、
-验证 6 个工具注册成功，并打印客户端配置片段。
+安装脚本会检查环境、安装依赖（优先用 `uv`，否则用 `pip`）、创建 `.env`、
+打印注册的工具数量，并给出客户端配置片段。
 
 **手动安装：**
 
@@ -769,24 +781,42 @@ Connect 的 `Propagate` 命令默认只传播 TLE 历元起约 1.5 小时。本�
 <details open>
 <summary><b>Claude Code</b></summary>
 
-在项目目录中运行：
+**推荐 — `uvx`（无需配置 PATH，使用隔离的 Python 3.11）：**
 
 ```bash
+claude mcp add stk --scope user \
+  --env STK_HOST=localhost --env STK_PORT=5001 \
+  -- uvx --python 3.11 --from /path/to/stk-mcp stk-mcp
+```
+
+`--scope user` 让服务器在所有项目中可用。`uvx` 会自动准备 Python 3.11 和依赖，
+因此系统 Python 低于 3.10 也能运行，并且不要求 `stk-mcp` 在 `PATH` 中。
+
+**备选 — 已安装的控制台脚本：**
+
+```bash
+pip install -e ".[com]"     # 安装 stk-mcp 命令
 claude mcp add stk -- stk-mcp
 ```
 
-或在项目根目录创建 `.mcp.json`：
+也可以在项目根目录手动创建 `.mcp.json`：
 
 ```json
 {
   "mcpServers": {
     "stk": {
-      "command": "stk-mcp",
-      "args": []
+      "command": "uvx",
+      "args": ["--python", "3.11", "--from", "/path/to/stk-mcp", "stk-mcp"],
+      "env": { "STK_HOST": "localhost", "STK_PORT": "5001" }
     }
   }
 }
 ```
+
+> **内置技能**：仓库自带 `skills/`，包含跨 agent 的引导式工作流（场景搭建、轨道设置、
+> 对象管理、Walker 星座、覆盖与可见性、访问/射频分析、碰撞预警、报告与工具、
+> 分析报告格式化）。任何 agent（Claude Code、Codex、Cursor 等）都可直接读取对应的
+> `SKILL.md`；Claude Code 如需自动发现，可把 `skills/` 复制或链接到 `.claude/skills/`。
 
 </details>
 
@@ -1153,7 +1183,7 @@ stk_analysis(action="aer",
 
 ### 结果报告
 
-内置的 **`stk-report`** 技能（`.claude/skills/stk-report/`）将 STK 原始输出格式化为
+内置的 **`stk-report`** 技能（`skills/stk-report/`）将 STK 原始输出格式化为
 结构化、带风险评级的报告。任意分析完成后，agent 生成包含以下内容的报告：
 
 - **头部** — 场景名、时间窗口、涉及对象
@@ -1215,8 +1245,8 @@ stk_analysis(action="aer",
 
 **双协议架构：**
 
-- **Connect TCP**（主通道）：对象创建、轨道设置、ACAT 计算、报告查询 — 速度快，覆盖 1100+ 命令
-- **COM**（辅助通道）：修复 Connect 无法设置的 `UseScenarioAnalysisTime` 属性，确保轨道传播覆盖完整场景时段
+- **Connect TCP**（主通道）：对象创建、轨道设置、ACAT 计算和报告查询；原始命令透传可覆盖全部 1100+ 条 Connect 命令
+- **COM**（辅助通道）：设置 Connect 无法写入的 `UseScenarioAnalysisTime`，让传播覆盖完整场景时段
 
 ### Connect 协议参考
 
@@ -1236,9 +1266,13 @@ STK Connect 是基于 TCP 端口 5001 的文本协议：
 
 ```
 stk-mcp/
+├── AGENTS.md                   # Agent 使用说明（Codex、Claude Code 等）
 ├── pyproject.toml              # 包配置 (hatchling 构建)
-├── install.ps1                 # 一键安装脚本 (Windows)
-├── install.sh                  # 一键安装脚本 (Linux/macOS)
+├── scripts/
+│   ├── install.ps1             # 安装脚本 (Windows)
+│   └── install.sh              # 安装脚本 (Linux/macOS)
+├── examples/
+│   └── mcp.json.example        # MCP 客户端配置模板
 ├── src/stk_mcp/
 │   ├── app.py                  # FastMCP 实例 + 生命周期
 │   ├── server.py               # 入口点，工具注册
@@ -1252,16 +1286,22 @@ stk-mcp/
 │       ├── cat.py              # stk_conjunction (11 动作)
 │       ├── analysis.py         # stk_analysis (10 动作)
 │       └── util.py             # stk_util (8 动作)
-├── .claude/skills/             # 内置 Claude Code 技能
+├── skills/                     # 跨 agent 技能指南
 │   ├── stk-scenario-scaffold/  # 场景搭建流程
+│   ├── stk-orbit-setup/        # 轨道定义、传播与寿命
+│   ├── stk-object-management/  # 地面站、传感器、通信链、星座
 │   ├── stk-walker-constellation/ # Walker 星座构建
 │   ├── stk-coverage-visibility/  # 覆盖与可见性分析
+│   ├── stk-access-rf-analysis/ # 访问、AER、链路与传感器查询
 │   ├── stk-conjunction/        # 碰撞预警流程
+│   ├── stk-util-operations/    # 报告、转换与原始命令
 │   └── stk-report/             # 分析报告格式化
 └── tests/
-    ├── mock_stk_server.py      # 离线测试用的模拟 STK Connect 服务器
-    ├── test_connect_protocol.py # 离线协议测试（无需 STK）
-    └── test_com.py             # COM 接口集成测试
+    ├── mock_stk_server.py        # 离线测试用的模拟 STK Connect 服务器
+    ├── test_connect_protocol.py  # 离线协议测试（无需 STK）
+    ├── test_connect_framing.py   # 报文分帧与错误恢复测试
+    ├── test_conjunction_*.py     # 交会校验与流程测试
+    └── test_com.py               # COM 集成测试（无 STK 时跳过）
 ```
 
 ### 已知限制

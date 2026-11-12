@@ -6,11 +6,11 @@
 # verifies tool registration. COM support is Windows-only and is skipped
 # here; the Connect TCP interface works cross-platform.
 #
-# Usage: ./install.sh
+# Usage: ./scripts/install.sh
 
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
 step() { printf '\033[36m==> %s\033[0m\n' "$1"; }

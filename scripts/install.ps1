@@ -8,11 +8,11 @@
     configuration snippet to register the server with an MCP client.
 
 .EXAMPLE
-    powershell -ExecutionPolicy Bypass -File install.ps1
+    powershell -ExecutionPolicy Bypass -File scripts/install.ps1
 #>
 
 $ErrorActionPreference = "Stop"
-$RepoRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+$RepoRoot = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 Set-Location $RepoRoot
 
 function Write-Step($msg) { Write-Host "==> $msg" -ForegroundColor Cyan }
