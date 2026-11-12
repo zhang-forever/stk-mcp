@@ -5,10 +5,7 @@ from __future__ import annotations
 from mcp.server.fastmcp import Context
 
 from stk_mcp.app import mcp
-
-
-def _get_state(ctx: Context):
-    return ctx.request_context.lifespan_context
+from stk_mcp.tools._common import get_state
 
 
 @mcp.tool()
@@ -36,7 +33,7 @@ async def stk_scenario(
         set_time_period  — Set analytical time window. Params: start_time, stop_time
         animate          — Control animation. Param: animate_action (Start/Pause/Reset/Faster/Slower/StepForward/StepReverse/Loop/RealTime/Refresh)
     """
-    state = _get_state(ctx)
+    state = get_state(ctx)
     client = state.client
 
     # ── connect ──────────────────────────────────────────────

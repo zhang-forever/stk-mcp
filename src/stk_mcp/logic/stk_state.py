@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
@@ -22,6 +23,7 @@ class StkState:
     port: int = 5001
     com_root: Any = field(default=None)
     com_app: Any = field(default=None)
+    com_last_attempt: float = field(default=0.0, repr=False)
 
     @property
     def connected(self) -> bool:
@@ -49,6 +51,23 @@ def _init_com() -> tuple[Any, Any]:
     except ImportError:
         logger.warning("pywin32 not installed — COM features disabled")
     return None, None
+
+
+COM_RETRY_SECONDS = 30.0
+
+
+def ensure_com(state: StkState) -> None:
+    """Retry COM discovery lazily if it was unavailable at server startup."""
+    if not isinstance(state, StkState) or state.com_root is not None:
+        return
+    now = time.monotonic()
+    if now - state.com_last_attempt < COM_RETRY_SECONDS:
+        return
+    state.com_last_attempt = now
+    app, root = _init_com()
+    if root is not None:
+        state.com_app = app
+        state.com_root = root
 
 
 def create_stk_lifespan(host: str = "localhost", port: int = 5001):

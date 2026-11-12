@@ -5,10 +5,7 @@ from __future__ import annotations
 from mcp.server.fastmcp import Context
 
 from stk_mcp.app import mcp
-
-
-def _get_client(ctx: Context):
-    return ctx.request_context.lifespan_context.client
+from stk_mcp.tools._common import StkCommandError, get_client, send_checked
 
 
 @mcp.tool()
@@ -63,7 +60,7 @@ async def stk_objects(
         remove           — Remove object. Param: object_path (e.g. "Satellite/Sat1")
         get_info         — Query object info. Params: object_path, info_type (properties/description/subobjects/all)
     """
-    client = _get_client(ctx)
+    client = get_client(ctx)
 
     # ── add_satellite ────────────────────────────────────────
     if action == "add_satellite":
@@ -81,9 +78,13 @@ async def stk_objects(
         r = await client.send_command(f"New / */Facility {name}")
         if r["ack"] != "ACK":
             return f"Failed to add facility: {r}"
-        await client.send_command(
-            f"SetPosition */Facility/{name} Geodetic {latitude} {longitude} {altitude}"
-        )
+        try:
+            await send_checked(
+                client,
+                f"SetPosition */Facility/{name} Geodetic {latitude} {longitude} {altitude}",
+            )
+        except StkCommandError as error:
+            return f"Facility '{name}' created, but position was not set: {error}"
         return f"Facility '{name}' added at ({latitude}, {longitude}, {altitude}m)"
 
     # ── add_target ───────────────────────────────────────────
@@ -93,9 +94,13 @@ async def stk_objects(
         r = await client.send_command(f"New / */Target {name}")
         if r["ack"] != "ACK":
             return f"Failed to add target: {r}"
-        await client.send_command(
-            f"SetPosition */Target/{name} Geodetic {latitude} {longitude} {altitude}"
-        )
+        try:
+            await send_checked(
+                client,
+                f"SetPosition */Target/{name} Geodetic {latitude} {longitude} {altitude}",
+            )
+        except StkCommandError as error:
+            return f"Target '{name}' created, but position was not set: {error}"
         return f"Target '{name}' added at ({latitude}, {longitude}, {altitude}m)"
 
     # ── add_sensor ───────────────────────────────────────────
@@ -105,7 +110,13 @@ async def stk_objects(
         r = await client.send_command(f"New / */{parent_path}/Sensor {name}")
         if r["ack"] != "ACK":
             return f"Failed to add sensor: {r}"
-        await client.send_command(f"Define */{parent_path}/Sensor/{name} SimpleCone {cone_angle}")
+        try:
+            await send_checked(
+                client,
+                f"Define */{parent_path}/Sensor/{name} SimpleCone {cone_angle}",
+            )
+        except StkCommandError as error:
+            return f"Sensor '{name}' created, but cone definition failed: {error}"
         return f"Sensor '{name}' added to {parent_path} (cone={cone_angle}deg)"
 
     # ── add_constellation ────────────────────────────────────
@@ -119,6 +130,7 @@ async def stk_objects(
         # Add satellites if provided
         if satellite_names:
             added = []
+            failed = []
             for sat_name in satellite_names.split(","):
                 sat_name = sat_name.strip()
                 if sat_name:
@@ -127,9 +139,15 @@ async def stk_objects(
                     )
                     if ar["ack"] == "ACK":
                         added.append(sat_name)
-            return (
-                f"Constellation '{name}' created with {len(added)} satellites: {', '.join(added)}"
+                    else:
+                        failed.append(sat_name)
+            message = (
+                f"Constellation '{name}' created with {len(added)} satellites: "
+                f"{', '.join(added)}"
             )
+            if failed:
+                message += f". Failed to add: {', '.join(failed)}"
+            return message
         return f"Constellation '{name}' created (empty — use Constellation Add to populate)"
 
     # ── add_chain ────────────────────────────────────────────
@@ -194,8 +212,16 @@ async def stk_objects(
             if grid_bounds.strip().lower() == "global"
             else f"AreaOfInterest {grid_bounds.strip()}"
         )
-        await client.send_command(f"Cov {cd} Grid {bounds_cmd}")
-        await client.send_command(f"Cov {cd} Grid PointGranularity LatLon {grid_resolution}")
+        try:
+            await send_checked(client, f"Cov {cd} Grid {bounds_cmd}")
+            await send_checked(
+                client, f"Cov {cd} Grid PointGranularity LatLon {grid_resolution}"
+            )
+        except StkCommandError as error:
+            return (
+                f"CoverageDefinition '{coverage_name}' created, "
+                f"but grid setup failed: {error}"
+            )
         # 3. Assign assets (Assign keyword, */ prefix)
         assets = [s.strip() for s in satellite_names.split(",") if s.strip()]
         if not assets:
@@ -204,10 +230,13 @@ async def stk_objects(
             if lr["ack"] == "ACK" and lr["data"]:
                 assets = [n.strip() for line in lr["data"] for n in line.split() if n.strip()]
         assigned = 0
+        failed_assets = []
         for sat in assets:
             ar = await client.send_command(f"Cov {cd} Asset */Satellite/{sat} Assign")
             if ar["ack"] == "ACK":
                 assigned += 1
+            else:
+                failed_assets.append(sat)
         # 4. Define the figure of merit
         fom_name = fom_type
         await client.send_command(f"New / {cd}/FigureOfMerit {fom_name}")
@@ -217,12 +246,19 @@ async def stk_objects(
         else:
             fom_def = "Definition RevisitTime Compute Maximum EndGaps Include"
         fr = await client.send_command(f"Cov {fom_path} FOMDefine {fom_def}")
-        return (
+        if fr["ack"] != "ACK":
+            return (
+                f"CoverageDefinition '{coverage_name}' created with "
+                f"{assigned} assets, but FOM definition failed: {fr}"
+            )
+        result = (
             f"CoverageDefinition '{coverage_name}' created: "
             f"grid={grid_bounds} @ {grid_resolution}deg, "
-            f"{assigned} assets assigned, FOM '{fom_name}' "
-            + ("defined" if fr["ack"] == "ACK" else f"FOM failed: {fr}")
+            f"{assigned} assets assigned, FOM '{fom_name}' defined"
         )
+        if failed_assets:
+            result += f". Assets not assigned: {', '.join(failed_assets)}"
+        return result
 
     # ── compute_coverage ─────────────────────────────────────
     elif action == "compute_coverage":

@@ -5,16 +5,13 @@ from __future__ import annotations
 from mcp.server.fastmcp import Context
 
 from stk_mcp.app import mcp
+from stk_mcp.tools._common import get_client
 from stk_mcp.validation import (
     CommandValidationError,
     validate_name,
     validate_object_ref,
     validate_path,
 )
-
-
-def _get_client(ctx: Context):
-    return ctx.request_context.lifespan_context.client
 
 
 @mcp.tool()
@@ -51,7 +48,7 @@ async def stk_analysis(
         visibility      — Lighting/visibility conditions. Params: from_object, to_object
         radar           — Radar analysis query. Params: object_path
     """
-    client = _get_client(ctx)
+    client = get_client(ctx)
 
     # Reject values that cannot be a single Connect token before they are
     # interpolated into a command (defense in depth; the client also rejects
