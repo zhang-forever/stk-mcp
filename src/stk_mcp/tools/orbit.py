@@ -7,33 +7,29 @@ import logging
 from mcp.server.fastmcp import Context
 
 from stk_mcp.app import mcp
+from stk_mcp.logic.stk_state import ensure_com
+from stk_mcp.tools._common import get_client, get_state
 
 logger = logging.getLogger("stk_mcp.tools.orbit")
-
-
-def _get_client(ctx: Context):
-    return ctx.request_context.lifespan_context.client
-
-
-def _get_state(ctx: Context):
-    return ctx.request_context.lifespan_context
 
 
 async def _propagate_satellite_result(
     ctx: Context, satellite_name: str, use_scenario_time: bool = True
 ) -> dict:
     """Propagate a satellite, using COM to set UseScenarioAnalysisTime if available."""
-    state = _get_state(ctx)
+    state = get_state(ctx)
     client = state.client
-    if use_scenario_time and state.com_available:
-        try:
-            sat_obj = state.com_root.GetObjectFromPath(f"Satellite/{satellite_name}")
-            if sat_obj is not None:
-                propagator = sat_obj.Propagator
-                propagator.UseScenarioAnalysisTime = True
-                logger.info("COM: set UseScenarioAnalysisTime=True for %s", satellite_name)
-        except Exception as e:
-            logger.warning("COM UseScenarioAnalysisTime failed for %s: %s", satellite_name, e)
+    if use_scenario_time:
+        ensure_com(state)
+        if state.com_available:
+            try:
+                sat_obj = state.com_root.GetObjectFromPath(f"Satellite/{satellite_name}")
+                if sat_obj is not None:
+                    propagator = sat_obj.Propagator
+                    propagator.UseScenarioAnalysisTime = True
+                    logger.info("COM: set UseScenarioAnalysisTime=True for %s", satellite_name)
+            except Exception as e:
+                logger.warning("COM UseScenarioAnalysisTime failed for %s: %s", satellite_name, e)
     return await client.send_command(f"Propagate */Satellite/{satellite_name}")
 
 
@@ -91,7 +87,7 @@ async def stk_orbit(
         position       — Query position at a given time. Params: satellite_name, time
         lifetime       — Estimate orbit lifetime/decay. Params: satellite_name
     """
-    client = _get_client(ctx)
+    client = get_client(ctx)
 
     # ── set_tle ──────────────────────────────────────────────
     if action == "set_tle":

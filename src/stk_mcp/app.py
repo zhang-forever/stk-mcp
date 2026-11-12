@@ -25,8 +25,27 @@ logging.basicConfig(
 )
 
 # Server configuration from environment
-STK_HOST = os.environ.get("STK_HOST", "localhost")
-STK_PORT = int(os.environ.get("STK_PORT", "5001"))
+logger = logging.getLogger("stk_mcp.app")
+
+
+def _env_int(name: str, default: int) -> int:
+    """Read a positive integer environment variable, falling back with a warning."""
+    raw = os.environ.get(name)
+    if raw is None or not raw.strip():
+        return default
+    try:
+        value = int(raw)
+    except ValueError:
+        logger.warning("Invalid %s=%r; using %d", name, raw, default)
+        return default
+    if not 1 <= value <= 65535:
+        logger.warning("%s=%d is out of range; using %d", name, value, default)
+        return default
+    return value
+
+
+STK_HOST = os.environ.get("STK_HOST", "localhost").strip() or "localhost"
+STK_PORT = _env_int("STK_PORT", 5001)
 
 # Create the MCP server with lifespan for STK connection lifecycle
 mcp = FastMCP(

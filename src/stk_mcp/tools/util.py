@@ -5,11 +5,8 @@ from __future__ import annotations
 from mcp.server.fastmcp import Context
 
 from stk_mcp.app import mcp
+from stk_mcp.tools._common import get_client
 from stk_mcp.validation import CommandValidationError, validate_raw_command
-
-
-def _get_client(ctx: Context):
-    return ctx.request_context.lifespan_context.client
 
 
 @mcp.tool()
@@ -50,7 +47,7 @@ async def stk_util(
         get_animation_time  — Get current animation time (no params needed)
         send_command        — Send raw STK Connect command. Params: command
     """
-    client = _get_client(ctx)
+    client = get_client(ctx)
 
     # ── report ───────────────────────────────────────────────
     if action == "report":

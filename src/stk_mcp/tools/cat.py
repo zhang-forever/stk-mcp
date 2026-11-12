@@ -9,11 +9,8 @@ from uuid import uuid4
 from mcp.server.fastmcp import Context
 
 from stk_mcp.app import mcp
+from stk_mcp.tools._common import get_client
 from stk_mcp.tools.orbit import _propagate_satellite_result
-
-
-def _get_client(ctx: Context):
-    return ctx.request_context.lifespan_context.client
 
 
 class _ConjunctionFailure(Exception):
@@ -159,7 +156,7 @@ async def stk_conjunction(
         acat_probability       — Compute Pc for a pair. Params: acat_name, primary_name, secondary_name, tca_time, method
         assess                 — End-to-end conjunction assessment. Params: primary_satellite, secondary_satellite, tle_*_line1/2, start_time, stop_time, threshold_km
     """
-    client = _get_client(ctx)
+    client = get_client(ctx)
     if action in {"acat_setup", "assess"} and bool(start_time) != bool(stop_time):
         return "Parameters 'start_time' and 'stop_time' must be supplied together"
     if action == "acat_setup" and sample_step_size != 0:

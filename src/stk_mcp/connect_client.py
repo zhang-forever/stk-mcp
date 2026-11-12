@@ -13,10 +13,19 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from typing import Literal, Optional, TypedDict
 
 from stk_mcp.validation import validate_command
 
 logger = logging.getLogger("stk_mcp.connect")
+
+
+class StkResult(TypedDict):
+    """Normalized result of a Connect command."""
+
+    ack: Literal["ACK", "NAK"]
+    data: list[str] | None
+    raw: str
 
 # Commands that return data and their read method:
 # 1 = single-line, 2 = multi-line
@@ -185,6 +194,8 @@ class StkConnectClient:
 
     async def connect(self) -> None:
         """Open TCP connection and enable ACK mode."""
+        if self._connected and self._writer is not None and not self._writer.is_closing():
+            return
         self._reader, self._writer = await asyncio.open_connection(self.host, self.port)
         self._connected = True
         logger.info("Connected to STK at %s:%d", self.host, self.port)
@@ -195,7 +206,14 @@ class StkConnectClient:
             # Some STK versions send no reply to AckOn. Only a wholly absent
             # reply is optional; a partial, malformed or rejected reply is not.
             ack = await self._read_ack(timeout=5.0, allow_missing=True)
-            if ack == "NAK":
+            if ack is None:
+                # Some STK builds reply slightly after the optional window.
+                # Parse a complete token instead of discarding raw bytes: a
+                # fragmented reply must not desynchronize the next command.
+                late = await self._read_ack(timeout=0.5, allow_missing=True)
+                if late == "NAK":
+                    raise ConnectionError("STK rejected ACK mode")
+            elif ack == "NAK":
                 raise ConnectionError("STK rejected ACK mode")
         except (Exception, asyncio.CancelledError):
             self._abort_connection()
@@ -217,10 +235,14 @@ class StkConnectClient:
                 await self._writer.wait_closed()
             except Exception:
                 pass
+        self._reader = None
+        self._writer = None
         self._connected = False
         logger.info("Disconnected from STK")
 
-    async def send_command(self, command: str, timeout: float = 120.0) -> dict:
+    async def send_command(
+        self, command: str, timeout: float = 120.0
+    ) -> StkResult:
         """
         Send a Connect command and return the result.
 
