@@ -142,8 +142,7 @@ async def stk_objects(
                     else:
                         failed.append(sat_name)
             message = (
-                f"Constellation '{name}' created with {len(added)} satellites: "
-                f"{', '.join(added)}"
+                f"Constellation '{name}' created with {len(added)} satellites: {', '.join(added)}"
             )
             if failed:
                 message += f". Failed to add: {', '.join(failed)}"
@@ -214,14 +213,9 @@ async def stk_objects(
         )
         try:
             await send_checked(client, f"Cov {cd} Grid {bounds_cmd}")
-            await send_checked(
-                client, f"Cov {cd} Grid PointGranularity LatLon {grid_resolution}"
-            )
+            await send_checked(client, f"Cov {cd} Grid PointGranularity LatLon {grid_resolution}")
         except StkCommandError as error:
-            return (
-                f"CoverageDefinition '{coverage_name}' created, "
-                f"but grid setup failed: {error}"
-            )
+            return f"CoverageDefinition '{coverage_name}' created, but grid setup failed: {error}"
         # 3. Assign assets (Assign keyword, */ prefix)
         assets = [s.strip() for s in satellite_names.split(",") if s.strip()]
         if not assets:
