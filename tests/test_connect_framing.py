@@ -4,8 +4,8 @@ import asyncio
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
-
 from mock_stk_server import _make_single_line, start_mock_server
+
 from stk_mcp.connect_client import StkConnectClient
 
 
@@ -67,16 +67,19 @@ async def test_fragmented_multiline_response():
         client._abort_connection()
 
 
-@pytest.mark.parametrize("payload,command", [
-    (b"BAD", "New / */Satellite Test"),
-    (b"ABC", "New / */Satellite Test"),
-    (b"NOPE", "New / */Satellite Test"),
-    (b"ACK" + b"GETSTKVERSION".ljust(40), "GetSTKVersion /"),
-    (b"ACK" + b"GETSTKVERSION invalid".ljust(40), "GetSTKVersion /"),
-    (b"ACK" + b"GETSTKVERSION -1".ljust(40), "GetSTKVersion /"),
-    (b"ACK" + _frame("ACATEVENTS_RM", "bad"), "ACATEvents_RM */AdvCAT/Test"),
-    (b"ACK" + _frame("ACATEVENTS_RM", "-1"), "ACATEvents_RM */AdvCAT/Test"),
-])
+@pytest.mark.parametrize(
+    "payload,command",
+    [
+        (b"BAD", "New / */Satellite Test"),
+        (b"ABC", "New / */Satellite Test"),
+        (b"NOPE", "New / */Satellite Test"),
+        (b"ACK" + b"GETSTKVERSION".ljust(40), "GetSTKVersion /"),
+        (b"ACK" + b"GETSTKVERSION invalid".ljust(40), "GetSTKVersion /"),
+        (b"ACK" + b"GETSTKVERSION -1".ljust(40), "GetSTKVersion /"),
+        (b"ACK" + _frame("ACATEVENTS_RM", "bad"), "ACATEvents_RM */AdvCAT/Test"),
+        (b"ACK" + _frame("ACATEVENTS_RM", "-1"), "ACATEvents_RM */AdvCAT/Test"),
+    ],
+)
 @pytest.mark.asyncio
 async def test_malformed_response_invalidates_connection(payload, command):
     client = _client()
@@ -90,7 +93,18 @@ async def test_malformed_response_invalidates_connection(payload, command):
         await client.send_command("CheckScenario /")
 
 
-@pytest.mark.parametrize("payload", [b"", b"A", b"AC", b"N", b"NAC", b"ACKshort", _make_single_line("GETSTKVERSION", "version")[:-1]])
+@pytest.mark.parametrize(
+    "payload",
+    [
+        b"",
+        b"A",
+        b"AC",
+        b"N",
+        b"NAC",
+        b"ACKshort",
+        _make_single_line("GETSTKVERSION", "version")[:-1],
+    ],
+)
 @pytest.mark.asyncio
 async def test_eof_invalidates_connection(payload):
     client = _client()
@@ -103,7 +117,9 @@ async def test_eof_invalidates_connection(payload):
     writer.close.assert_called_once()
 
 
-@pytest.mark.parametrize("payload", [b"", b"A", b"NAC", b"ACKshort", _make_single_line("GETSTKVERSION", "version")[:-1]])
+@pytest.mark.parametrize(
+    "payload", [b"", b"A", b"NAC", b"ACKshort", _make_single_line("GETSTKVERSION", "version")[:-1]]
+)
 @pytest.mark.asyncio
 async def test_timeout_invalidates_connection(payload):
     client = _client()

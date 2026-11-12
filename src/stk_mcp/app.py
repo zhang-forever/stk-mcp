@@ -14,6 +14,7 @@ import os
 import sys
 
 from mcp.server.fastmcp import FastMCP
+
 from stk_mcp.logic.stk_state import create_stk_lifespan
 
 # Configure logging

@@ -6,10 +6,9 @@ Imports mcp from app.py, registers all tools, and starts the server.
 
 from __future__ import annotations
 
-from stk_mcp.app import mcp
-
 # Import all tool modules to trigger @mcp.tool() registration
 import stk_mcp.tools  # noqa: E402, F401
+from stk_mcp.app import mcp
 
 
 def main():

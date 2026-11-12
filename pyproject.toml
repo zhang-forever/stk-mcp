@@ -26,7 +26,12 @@ dependencies = [
 
 [project.optional-dependencies]
 com = ["pywin32"]
-dev = ["pytest>=8.0", "pytest-asyncio>=0.23"]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "pytest-cov>=5.0",
+    "ruff>=0.6",
+]
 
 [project.scripts]
 stk-mcp = "stk_mcp.server:main"
@@ -38,6 +43,15 @@ Issues = "https://github.com/zhang-forever/stk-mcp/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/stk_mcp"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+extend-exclude = [".venv", "build", "dist"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["E501"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

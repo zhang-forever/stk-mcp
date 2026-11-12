@@ -105,9 +105,7 @@ async def stk_objects(
         r = await client.send_command(f"New / */{parent_path}/Sensor {name}")
         if r["ack"] != "ACK":
             return f"Failed to add sensor: {r}"
-        await client.send_command(
-            f"Define */{parent_path}/Sensor/{name} SimpleCone {cone_angle}"
-        )
+        await client.send_command(f"Define */{parent_path}/Sensor/{name} SimpleCone {cone_angle}")
         return f"Sensor '{name}' added to {parent_path} (cone={cone_angle}deg)"
 
     # ── add_constellation ────────────────────────────────────
@@ -129,7 +127,9 @@ async def stk_objects(
                     )
                     if ar["ack"] == "ACK":
                         added.append(sat_name)
-            return f"Constellation '{name}' created with {len(added)} satellites: {', '.join(added)}"
+            return (
+                f"Constellation '{name}' created with {len(added)} satellites: {', '.join(added)}"
+            )
         return f"Constellation '{name}' created (empty — use Constellation Add to populate)"
 
     # ── add_chain ────────────────────────────────────────────
@@ -185,9 +185,7 @@ async def stk_objects(
             return "Parameter 'coverage_name' is required"
         cd = f"*/CoverageDefinition/{coverage_name}"
         # 1. Create the coverage definition (class path + instance name, per New syntax)
-        r = await client.send_command(
-            f"New / */CoverageDefinition {coverage_name}"
-        )
+        r = await client.send_command(f"New / */CoverageDefinition {coverage_name}")
         if r["ack"] != "ACK":
             return f"Failed to create coverage definition: {r}"
         # 2. Define the grid (bounds + resolution)
@@ -197,23 +195,17 @@ async def stk_objects(
             else f"AreaOfInterest {grid_bounds.strip()}"
         )
         await client.send_command(f"Cov {cd} Grid {bounds_cmd}")
-        await client.send_command(
-            f"Cov {cd} Grid PointGranularity LatLon {grid_resolution}"
-        )
+        await client.send_command(f"Cov {cd} Grid PointGranularity LatLon {grid_resolution}")
         # 3. Assign assets (Assign keyword, */ prefix)
         assets = [s.strip() for s in satellite_names.split(",") if s.strip()]
         if not assets:
             # No explicit list: assign every satellite in the scenario.
             lr = await client.send_command("AllInstanceNames / */Satellite")
             if lr["ack"] == "ACK" and lr["data"]:
-                assets = [
-                    n.strip() for line in lr["data"] for n in line.split() if n.strip()
-                ]
+                assets = [n.strip() for line in lr["data"] for n in line.split() if n.strip()]
         assigned = 0
         for sat in assets:
-            ar = await client.send_command(
-                f"Cov {cd} Asset */Satellite/{sat} Assign"
-            )
+            ar = await client.send_command(f"Cov {cd} Asset */Satellite/{sat} Assign")
             if ar["ack"] == "ACK":
                 assigned += 1
         # 4. Define the figure of merit

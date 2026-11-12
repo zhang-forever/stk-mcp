@@ -13,7 +13,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Optional
+
+from stk_mcp.validation import validate_command
 
 logger = logging.getLogger("stk_mcp.connect")
 
@@ -173,8 +174,8 @@ class StkConnectClient:
     def __init__(self, host: str = "localhost", port: int = 5001):
         self.host = host
         self.port = port
-        self._reader: Optional[asyncio.StreamReader] = None
-        self._writer: Optional[asyncio.StreamWriter] = None
+        self._reader: asyncio.StreamReader | None = None
+        self._writer: asyncio.StreamWriter | None = None
         self._lock = asyncio.Lock()
         self._connected = False
 
@@ -184,9 +185,7 @@ class StkConnectClient:
 
     async def connect(self) -> None:
         """Open TCP connection and enable ACK mode."""
-        self._reader, self._writer = await asyncio.open_connection(
-            self.host, self.port
-        )
+        self._reader, self._writer = await asyncio.open_connection(self.host, self.port)
         self._connected = True
         logger.info("Connected to STK at %s:%d", self.host, self.port)
 
@@ -221,9 +220,7 @@ class StkConnectClient:
         self._connected = False
         logger.info("Disconnected from STK")
 
-    async def send_command(
-        self, command: str, timeout: float = 120.0
-    ) -> dict:
+    async def send_command(self, command: str, timeout: float = 120.0) -> dict:
         """
         Send a Connect command and return the result.
 
@@ -238,8 +235,7 @@ class StkConnectClient:
             if not self._connected:
                 raise ConnectionError("Not connected to STK")
 
-            if not command.strip():
-                raise ValueError("Command must not be empty")
+            command = validate_command(command)
 
             try:
                 # Send the command
@@ -288,46 +284,34 @@ class StkConnectClient:
         self._writer.write((command + "\n").encode("utf-8"))
         await self._writer.drain()
 
-    async def _read_ack(
-        self, timeout: float = 10.0, *, allow_missing: bool = False
-    ) -> str | None:
+    async def _read_ack(self, timeout: float = 10.0, *, allow_missing: bool = False) -> str | None:
         """Read the complete wire token and normalize NACK to API value NAK."""
         if not self._reader:
             raise ConnectionError("Reader not initialized")
 
         try:
-            first = await asyncio.wait_for(
-                self._reader.readexactly(1), timeout=timeout
-            )
+            first = await asyncio.wait_for(self._reader.readexactly(1), timeout=timeout)
         except asyncio.TimeoutError:
             if allow_missing:
                 return None
             raise
 
         if first == b"A":
-            tail = await asyncio.wait_for(
-                self._reader.readexactly(2), timeout=timeout
-            )
+            tail = await asyncio.wait_for(self._reader.readexactly(2), timeout=timeout)
             if tail == b"CK":
                 return "ACK"
         elif first == b"N":
-            tail = await asyncio.wait_for(
-                self._reader.readexactly(3), timeout=timeout
-            )
+            tail = await asyncio.wait_for(self._reader.readexactly(3), timeout=timeout)
             if tail == b"ACK":
                 return "NAK"
         raise ValueError("Invalid STK ACK/NACK response")
 
-    async def _read_header(
-        self, timeout: float = 30.0
-    ) -> tuple[str, int]:
+    async def _read_header(self, timeout: float = 30.0) -> tuple[str, int]:
         """Read a 40-byte return header. Returns (command_name, byte_count)."""
         if not self._reader:
             raise ConnectionError("Reader not initialized")
 
-        raw = await asyncio.wait_for(
-            self._reader.readexactly(HEADER_LENGTH), timeout=timeout
-        )
+        raw = await asyncio.wait_for(self._reader.readexactly(HEADER_LENGTH), timeout=timeout)
         header_text = raw.decode("utf-8").strip()
 
         # Parse: "COMMANDNAME    NUMBYTES"
@@ -339,24 +323,18 @@ class StkConnectClient:
             raise ValueError(f"Invalid STK byte count: {count!r}")
         return cmd_name, int(count)
 
-    async def _read_single_line(
-        self, timeout: float = 30.0
-    ) -> list[str]:
+    async def _read_single_line(self, timeout: float = 30.0) -> list[str]:
         """Read single-line return data."""
         cmd_name, num_bytes = await self._read_header(timeout=timeout)
 
         if num_bytes <= 0:
             return []
 
-        raw = await asyncio.wait_for(
-            self._reader.readexactly(num_bytes), timeout=timeout
-        )
+        raw = await asyncio.wait_for(self._reader.readexactly(num_bytes), timeout=timeout)
         text = raw.decode("utf-8").strip()
         return [text] if text else []
 
-    async def _read_multi_line(
-        self, timeout: float = 120.0
-    ) -> list[str]:
+    async def _read_multi_line(self, timeout: float = 120.0) -> list[str]:
         """Read multi-line return data."""
         # First header gives the row count
         _cmd_name, num_bytes = await self._read_header(timeout=timeout)
@@ -365,9 +343,7 @@ class StkConnectClient:
             return []
 
         # Read the number of rows
-        raw_count = await asyncio.wait_for(
-            self._reader.readexactly(num_bytes), timeout=timeout
-        )
+        raw_count = await asyncio.wait_for(self._reader.readexactly(num_bytes), timeout=timeout)
         count = raw_count.decode("utf-8").strip()
         if not count.isascii() or not count.isdecimal():
             raise ValueError(f"Invalid STK row count: {count!r}")
@@ -377,9 +353,7 @@ class StkConnectClient:
         for _ in range(num_rows):
             _cmd, nbytes = await self._read_header(timeout=timeout)
             if nbytes > 0:
-                raw = await asyncio.wait_for(
-                    self._reader.readexactly(nbytes), timeout=timeout
-                )
+                raw = await asyncio.wait_for(self._reader.readexactly(nbytes), timeout=timeout)
                 line = raw.decode("utf-8").strip()
                 if line:
                     lines.append(line)

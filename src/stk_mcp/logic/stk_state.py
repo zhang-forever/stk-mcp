@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
-from typing import AsyncIterator, Any, Optional
+from typing import Any
 
 from stk_mcp.connect_client import StkConnectClient
 
@@ -35,6 +36,7 @@ def _init_com() -> tuple[Any, Any]:
     """Try to connect to STK via COM. Returns (com_app, com_root) or (None, None)."""
     try:
         import win32com.client
+
         for prog_id in ["STK12.Application", "STK11.Application", "STK.Application"]:
             try:
                 app = win32com.client.GetActiveObject(prog_id)
@@ -71,8 +73,11 @@ def create_stk_lifespan(host: str = "localhost", port: int = 5001):
         com_app, com_root = _init_com()
 
         state = StkState(
-            client=client, host=host, port=port,
-            com_app=com_app, com_root=com_root,
+            client=client,
+            host=host,
+            port=port,
+            com_app=com_app,
+            com_root=com_root,
         )
         try:
             yield state

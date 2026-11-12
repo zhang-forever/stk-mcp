@@ -20,8 +20,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from stk_mcp.connect_client import StkConnectClient  # noqa: E402
 from mock_stk_server import start_mock_server  # noqa: E402
+
+from stk_mcp.connect_client import StkConnectClient  # noqa: E402
 
 
 async def _with_client(coro):

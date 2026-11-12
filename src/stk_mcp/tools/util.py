@@ -5,6 +5,7 @@ from __future__ import annotations
 from mcp.server.fastmcp import Context
 
 from stk_mcp.app import mcp
+from stk_mcp.validation import CommandValidationError, validate_raw_command
 
 
 def _get_client(ctx: Context):
@@ -68,7 +69,9 @@ async def stk_util(
             cmd += " AllLines On"
         r = await client.send_command(cmd)
         if r["ack"] == "ACK" and r["data"]:
-            return f"Report '{style}' for {object_path} ({len(r['data'])} lines):\n" + "\n".join(r["data"])
+            return f"Report '{style}' for {object_path} ({len(r['data'])} lines):\n" + "\n".join(
+                r["data"]
+            )
         elif r["ack"] == "ACK":
             return f"Report '{style}' for {object_path}: No data"
         return f"Failed to get report: {r}"
@@ -77,10 +80,7 @@ async def stk_util(
     elif action == "save_report":
         if not object_path or not style or not file_path:
             return "Parameters 'object_path', 'style', and 'file_path' are required"
-        cmd = (
-            f'ReportCreate */{object_path} Type Save Style "{style}" '
-            f'File "{file_path}"'
-        )
+        cmd = f'ReportCreate */{object_path} Type Save Style "{style}" File "{file_path}"'
         if time_period:
             cmd += f' TimePeriod "{time_period}"'
         elif access_object:
@@ -128,7 +128,7 @@ async def stk_util(
             cmd += f" Format {date_format}"
         r = await client.send_command(cmd)
         if r["ack"] == "ACK" and r["data"]:
-            return f"Date conversion:\n" + r["raw"]
+            return "Date conversion:\n" + r["raw"]
         return f"Failed: {r}"
 
     # ── convert_unit ─────────────────────────────────────────
@@ -152,6 +152,10 @@ async def stk_util(
     elif action == "send_command":
         if not command:
             return "Parameter 'command' is required"
+        try:
+            command = validate_raw_command(command)
+        except CommandValidationError as exc:
+            return f"Invalid input: {exc}"
         r = await client.send_command(command)
         output = [f"Command: {command}", f"ACK: {r['ack']}"]
         if r["data"]:

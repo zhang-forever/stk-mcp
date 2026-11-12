@@ -659,6 +659,27 @@ Contributions are welcome. To add new tool actions:
 
 ---
 
+
+### Security: input validation and raw commands
+
+Every argument that is interpolated into a Connect command is validated before it reaches the
+socket: names and object paths must be single STK tokens (no spaces, no `..` segments), and the
+final command line may not contain newlines, NUL bytes or other control characters. This blocks
+command injection through tool arguments — an LLM call can no longer smuggle a second Connect
+command into a name such as `Sat1\nDelete *`.
+
+The generic escape hatch `stk_util(action="send_command")` is **disabled by default** because a
+single raw Connect command can still delete a scenario or change global preferences. Enable it
+explicitly when you need it:
+
+```bash
+export STK_MCP_ALLOW_RAW_COMMAND=1   # PowerShell: $env:STK_MCP_ALLOW_RAW_COMMAND = "1"
+```
+
+Validation lives in `src/stk_mcp/validation.py` and is enforced both in the tools and in
+`StkConnectClient.send_command`, so a new tool cannot bypass it by building its own command string.
+
+
 ## 中文
 
 基于 MCP (Model Context Protocol) 的 STK 控制服务器，通过 Connect TCP 接口让 AI Agent 直接操控 [AGI STK](https://www.agi.com/products/stk)（Systems Tool Kit）——航天任务分析的行业标准平台。通过自然语言即可驱动卫星任务分析、碰撞预警、覆盖预测和场景自动化。

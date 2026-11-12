@@ -30,6 +30,7 @@ except ImportError:
 def test_com():
     try:
         import win32com.client
+
         print("[OK] win32com available")
     except ImportError:
         print("[FAIL] win32com not installed. Run: pip install pywin32")
@@ -63,7 +64,7 @@ def test_com():
 
     # Get root object
     root = stk_app.Personality2
-    print(f"[OK] Got IAgStkObjectRoot")
+    print("[OK] Got IAgStkObjectRoot")
 
     # Check current scenario
     if root.Children.Count > 0:
@@ -72,7 +73,7 @@ def test_com():
     else:
         print("[INFO] No scenario loaded, creating one...")
         scenario = root.NewScenario("COMTest")
-        print(f"[OK] Created scenario: COMTest")
+        print("[OK] Created scenario: COMTest")
 
     # List existing satellites
     sats = scenario.Children.GetElements(18)  # eSatellite = 18
@@ -91,7 +92,7 @@ def test_com():
         print("[INFO] Primary already exists, reusing")
 
     sat1_iface = sat1
-    print(f"[OK] Satellite 'Primary' ready")
+    print("[OK] Satellite 'Primary' ready")
 
     # Set orbit using SetState (COM method)
     try:
@@ -100,11 +101,11 @@ def test_com():
             '"14 Jun 2026 16:00:00.000" 6778137 0.0007 51.64 0 0 0'
         )
         print("[OK] Primary orbit set (Classical HPOP)")
-    except Exception as e:
+    except Exception:
         # Try via Connect command through COM
         try:
             root.ExecuteCommand(
-                'SetState */Satellite/Primary Classical HPOP UseScenarioInterval 60 J2000 '
+                "SetState */Satellite/Primary Classical HPOP UseScenarioInterval 60 J2000 "
                 '"14 Jun 2026 16:00:00.000" 6778137 0.0007 51.64 0 0 0'
             )
             print("[OK] Primary orbit set via ExecuteCommand")
@@ -119,7 +120,7 @@ def test_com():
         print("[INFO] Debris already exists, reusing")
 
     sat2_iface = sat2
-    print(f"[OK] Satellite 'Debris' ready")
+    print("[OK] Satellite 'Debris' ready")
 
     try:
         sat2_iface.SetState(
@@ -127,10 +128,10 @@ def test_com():
             '"14 Jun 2026 16:00:00.000" 6778500 0.001 51.7 5 5 180'
         )
         print("[OK] Debris orbit set (Classical HPOP)")
-    except Exception as e:
+    except Exception:
         try:
             root.ExecuteCommand(
-                'SetState */Satellite/Debris Classical HPOP UseScenarioInterval 60 J2000 '
+                "SetState */Satellite/Debris Classical HPOP UseScenarioInterval 60 J2000 "
                 '"14 Jun 2026 16:00:00.000" 6778500 0.001 51.7 5 5 180'
             )
             print("[OK] Debris orbit set via ExecuteCommand")
@@ -206,7 +207,7 @@ def test_com():
     try:
         result = root.ExecuteCommand("AER */Satellite/Primary */Satellite/Debris")
         lines = str(result).split("\n")[:3]
-        print(f"[OK] AER data (first 3 lines):")
+        print("[OK] AER data (first 3 lines):")
         for line in lines:
             print(f"  {line}")
     except Exception as e:

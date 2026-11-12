@@ -27,6 +27,7 @@ def _report_failures(function):
             return await function(*args, **kwargs)
         except _ConjunctionFailure as error:
             return f"Conjunction operation failed: {error}. Earlier changes may remain; no rollback was attempted."
+
     return checked
 
 
@@ -180,42 +181,40 @@ async def stk_conjunction(
         if range_threshold <= 0:
             return "Parameter 'range_threshold' must be positive"
         distances = await _distances(
-            client, range_threshold=range_threshold,
+            client,
+            range_threshold=range_threshold,
             filter_apogee_perigee=filter_apogee_perigee,
             filter_orbit_path=filter_orbit_path,
         )
         results = []
         await _send_checked(
-            client,
-            f"CAT */Satellite/{satellite_name} Range {distances['range_threshold']}"
+            client, f"CAT */Satellite/{satellite_name} Range {distances['range_threshold']}"
         )
         results.append(f"Range threshold: {range_threshold} km")
 
         if database_path:
             await _send_checked(
-                client,
-                f'CAT */Satellite/{satellite_name} Database "{database_path}"'
+                client, f'CAT */Satellite/{satellite_name} Database "{database_path}"'
             )
             results.append(f"Database: {database_path}")
 
         if filter_apogee_perigee > 0:
             await _send_checked(
                 client,
-                f"CAT */Satellite/{satellite_name} Filter ApogeePerigee {distances['filter_apogee_perigee']}"
+                f"CAT */Satellite/{satellite_name} Filter ApogeePerigee {distances['filter_apogee_perigee']}",
             )
             results.append(f"Apogee/Perigee filter: {filter_apogee_perigee} km")
 
         if filter_orbit_path > 0:
             await _send_checked(
                 client,
-                f"CAT */Satellite/{satellite_name} Filter OrbitPath {distances['filter_orbit_path']}"
+                f"CAT */Satellite/{satellite_name} Filter OrbitPath {distances['filter_orbit_path']}",
             )
             results.append(f"Orbit path filter: {filter_orbit_path} km")
 
         if add_threats:
             await _send_checked(
-                client,
-                f"CAT */Satellite/{satellite_name} AddThreats On {max_threats}"
+                client, f"CAT */Satellite/{satellite_name} AddThreats On {max_threats}"
             )
             results.append(f"Add threats: On (max {max_threats})")
 
@@ -251,15 +250,13 @@ async def stk_conjunction(
 
         if start_time and stop_time:
             await _send_checked(
-                client,
-                f'ACAT */AdvCAT/{acat_name} TimePeriod "{start_time}" "{stop_time}"'
+                client, f'ACAT */AdvCAT/{acat_name} TimePeriod "{start_time}" "{stop_time}"'
             )
             results.append(f"Time period: {start_time} to {stop_time}")
 
         if threshold > 0:
             await _send_checked(
-                client,
-                f"ACAT */AdvCAT/{acat_name} Threshold {distances['threshold']}"
+                client, f"ACAT */AdvCAT/{acat_name} Threshold {distances['threshold']}"
             )
             results.append(f"Threshold: {threshold} km")
 
@@ -269,9 +266,7 @@ async def stk_conjunction(
     elif action == "acat_add_primary":
         if not object_path:
             return "Parameter 'object_path' is required (e.g. 'Satellite/Sat1')"
-        r = await client.send_command(
-            f"ACAT */AdvCAT/{acat_name} Primary Add {object_path}"
-        )
+        r = await client.send_command(f"ACAT */AdvCAT/{acat_name} Primary Add {object_path}")
         if r["ack"] == "ACK":
             return f"Primary added: {object_path}"
         return f"Failed: {r}"
@@ -297,32 +292,29 @@ async def stk_conjunction(
     # ── acat_set_prefilters ──────────────────────────────────
     elif action == "acat_set_prefilters":
         distances = await _distances(
-            client, apogee_perigee=apogee_perigee, orbit_path=orbit_path,
+            client,
+            apogee_perigee=apogee_perigee,
+            orbit_path=orbit_path,
         )
         results = []
         if out_of_date:
             await _send_checked(
-                client,
-                f"ACAT */AdvCAT/{acat_name} PreFilters OutOfDate {out_of_date}"
+                client, f"ACAT */AdvCAT/{acat_name} PreFilters OutOfDate {out_of_date}"
             )
             results.append(f"OutOfDate: {out_of_date}")
         if apogee_perigee > 0:
             await _send_checked(
                 client,
-                f"ACAT */AdvCAT/{acat_name} PreFilters ApogeePerigee {distances['apogee_perigee']}"
+                f"ACAT */AdvCAT/{acat_name} PreFilters ApogeePerigee {distances['apogee_perigee']}",
             )
             results.append(f"ApogeePerigee: {apogee_perigee} km")
         if orbit_path > 0:
             await _send_checked(
-                client,
-                f"ACAT */AdvCAT/{acat_name} PreFilters OrbitPath {distances['orbit_path']}"
+                client, f"ACAT */AdvCAT/{acat_name} PreFilters OrbitPath {distances['orbit_path']}"
             )
             results.append(f"OrbitPath: {orbit_path} km")
         if time_filter:
-            await _send_checked(
-                client,
-                f"ACAT */AdvCAT/{acat_name} PreFilters Time {time_filter}"
-            )
+            await _send_checked(client, f"ACAT */AdvCAT/{acat_name} PreFilters Time {time_filter}")
             results.append(f"Time: {time_filter}")
         return "Prefilters:\n" + "\n".join(results) if results else "No filters changed"
 
@@ -353,10 +345,7 @@ async def stk_conjunction(
             cmd += f" Sort {sort_by}"
         r = await client.send_command(cmd)
         if r["ack"] == "ACK" and r["data"]:
-            return (
-                f"Conjunction events ({len(r['data'])} events):\n"
-                + "\n".join(r["data"])
-            )
+            return f"Conjunction events ({len(r['data'])} events):\n" + "\n".join(r["data"])
         elif r["ack"] == "ACK":
             return "No conjunction events found"
         return f"Failed: {r}"
@@ -366,15 +355,12 @@ async def stk_conjunction(
         if not primary_name or not secondary_name or not tca_time:
             return "Parameters 'primary_name', 'secondary_name', 'tca_time' are required"
         r = await client.send_command(
-            f'ACATProbability_R */AdvCAT/{acat_name} '
+            f"ACATProbability_R */AdvCAT/{acat_name} "
             f"Primary {primary_name} Secondary {secondary_name} "
             f'TCA "{tca_time}" Method {method}'
         )
         if r["ack"] == "ACK" and r["data"]:
-            return (
-                f"Pc ({primary_name} vs {secondary_name}):\n"
-                + "\n".join(r["data"])
-            )
+            return f"Pc ({primary_name} vs {secondary_name}):\n" + "\n".join(r["data"])
         elif r["ack"] == "ACK":
             return "No probability data available"
         return f"Failed: {r}"
@@ -405,9 +391,7 @@ async def stk_conjunction(
         ):
             if not line1:
                 continue
-            await _send_checked(
-                client, f'SetState */Satellite/{satellite} TLE "{line1}" "{line2}"'
-            )
+            await _send_checked(client, f'SetState */Satellite/{satellite} TLE "{line1}" "{line2}"')
             try:
                 propagated = await _propagate_satellite_result(ctx, satellite)
             except Exception as error:
@@ -423,21 +407,17 @@ async def stk_conjunction(
         steps.append(f"Assessment object: {assessment_name}")
         if start_time and stop_time:
             await _send_checked(
-                client,
-                f'ACAT */AdvCAT/{assessment_name} TimePeriod "{start_time}" "{stop_time}"'
+                client, f'ACAT */AdvCAT/{assessment_name} TimePeriod "{start_time}" "{stop_time}"'
             )
             steps.append(f"Time: {start_time} to {stop_time}")
         await _send_checked(
-            client,
-            f"ACAT */AdvCAT/{assessment_name} Threshold {distances['threshold_km']}"
+            client, f"ACAT */AdvCAT/{assessment_name} Threshold {distances['threshold_km']}"
         )
         await _send_checked(
-            client,
-            f"ACAT */AdvCAT/{assessment_name} Primary Add Satellite/{primary_satellite}"
+            client, f"ACAT */AdvCAT/{assessment_name} Primary Add Satellite/{primary_satellite}"
         )
         await _send_checked(
-            client,
-            f"ACAT */AdvCAT/{assessment_name} Secondary Add Satellite/{secondary_satellite}"
+            client, f"ACAT */AdvCAT/{assessment_name} Secondary Add Satellite/{secondary_satellite}"
         )
         steps.append(f"Primary: {primary_satellite}, Secondary: {secondary_satellite}")
 
