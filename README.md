@@ -144,7 +144,7 @@ Or manually create `.mcp.json` in your project root:
 > constellations, coverage & visibility, access/RF analysis, conjunction
 > assessment, reports, and **analysis report formatting**. Point any agent
 > (Claude Code, Codex, Cursor, etc.) at the matching `SKILL.md`. Claude Code can
-> auto-discover them by copying or linking `skills/` to `skills/`.
+> auto-discover them by copying or linking `skills/` to `.claude/skills/`.
 
 </details>
 
@@ -795,7 +795,7 @@ claude mcp add stk -- stk-mcp
 > **内置技能**：仓库自带 `skills/`，包含跨 agent 的引导式工作流（场景搭建、轨道设置、
 > 对象管理、Walker 星座、覆盖与可见性、访问/射频分析、碰撞预警、报告与工具、
 > 分析报告格式化）。任何 agent（Claude Code、Codex、Cursor 等）都可直接读取对应的
-> `SKILL.md`；Claude Code 如需自动发现，可把 `skills/` 复制或链接到 `skills/`。
+> `SKILL.md`；Claude Code 如需自动发现，可把 `skills/` 复制或链接到 `.claude/skills/`。
 
 </details>
 
