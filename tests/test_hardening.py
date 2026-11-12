@@ -24,9 +24,7 @@ class FakeClient:
 
 def context(client):
     return SimpleNamespace(
-        request_context=SimpleNamespace(
-            lifespan_context=SimpleNamespace(client=client)
-        )
+        request_context=SimpleNamespace(lifespan_context=SimpleNamespace(client=client))
     )
 
 

@@ -76,6 +76,9 @@ stk_util send_command command="Chains */Chain/MyChain Add */Satellite/ISS"
 
 - Only commands listed in `RETURN_DATA_COMMANDS` have their response body read.
   For other commands you receive the ACK/NAK only.
+- The raw passthrough is **disabled by default**. Set
+  `STK_MCP_ALLOW_RAW_COMMAND=1` in the server environment to enable
+  `stk_util(action="send_command")`.
 - Include the scope token (`/`, `*`) required by the command; omitting it is a
   common cause of `NAK`.
 - Multi-line responses are returned as one line per row.

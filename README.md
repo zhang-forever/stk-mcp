@@ -269,6 +269,7 @@ If `stk-mcp` is not in your PATH, use the full path:
 |---|---|---|
 | `STK_HOST` | `localhost` | STK host address (use IP for remote) |
 | `STK_PORT` | `5001` | STK Connect TCP port |
+| `STK_MCP_ALLOW_RAW_COMMAND` | unset (disabled) | Set to `1` to enable `stk_util(action="send_command")` |
 
 ### Tool Reference
 
@@ -606,9 +607,11 @@ stk-mcp/
 │   ├── app.py                  # FastMCP instance + lifespan
 │   ├── server.py               # Entry point, tool registration
 │   ├── connect_client.py       # STK Connect TCP protocol client
+│   ├── validation.py           # Connect command and argument validation
 │   ├── logic/
 │   │   └── stk_state.py        # State management (Connect + COM)
 │   └── tools/
+│       ├── _common.py          # Shared context and checked-command helpers
 │       ├── scenario.py         # stk_scenario (9 actions)
 │       ├── objects.py          # stk_objects (13 actions)
 │       ├── orbit.py            # stk_orbit (7 actions)
@@ -630,6 +633,8 @@ stk-mcp/
     ├── test_connect_protocol.py  # Offline protocol tests (no STK required)
     ├── test_connect_framing.py   # Framing and error-recovery tests
     ├── test_conjunction_*.py     # Conjunction validation and workflow tests
+    ├── test_validation.py        # Command and argument validation tests
+    ├── test_hardening.py         # Failure-path and connection regressions
     └── test_com.py               # COM integration test (skipped without STK)
 ```
 
@@ -941,6 +946,7 @@ claude mcp add stk -- stk-mcp
 |---|---|---|
 | `STK_HOST` | `localhost` | STK 主机地址（远程时填 IP） |
 | `STK_PORT` | `5001` | STK Connect TCP 端口 |
+| `STK_MCP_ALLOW_RAW_COMMAND` | 未设置（禁用） | 设为 `1` 才启用 `stk_util(action="send_command")` |
 
 ### 工具列表
 
@@ -1277,9 +1283,11 @@ stk-mcp/
 │   ├── app.py                  # FastMCP 实例 + 生命周期
 │   ├── server.py               # 入口点，工具注册
 │   ├── connect_client.py       # STK Connect TCP 协议客户端
+│   ├── validation.py           # Connect 命令与参数校验
 │   ├── logic/
 │   │   └── stk_state.py        # 状态管理 (Connect + COM)
 │   └── tools/
+│       ├── _common.py          # 共享上下文与带检查的命令助手
 │       ├── scenario.py         # stk_scenario (9 动作)
 │       ├── objects.py          # stk_objects (13 动作)
 │       ├── orbit.py            # stk_orbit (7 动作)
@@ -1301,6 +1309,8 @@ stk-mcp/
     ├── test_connect_protocol.py  # 离线协议测试（无需 STK）
     ├── test_connect_framing.py   # 报文分帧与错误恢复测试
     ├── test_conjunction_*.py     # 交会校验与流程测试
+    ├── test_validation.py        # 命令与参数校验测试
+    ├── test_hardening.py         # 失败路径与连接回归测试
     └── test_com.py               # COM 集成测试（无 STK 时跳过）
 ```
 

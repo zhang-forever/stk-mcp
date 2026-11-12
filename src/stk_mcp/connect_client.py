@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Literal, Optional, TypedDict
+from typing import Literal, TypedDict
 
 from stk_mcp.validation import validate_command
 
@@ -26,6 +26,7 @@ class StkResult(TypedDict):
     ack: Literal["ACK", "NAK"]
     data: list[str] | None
     raw: str
+
 
 # Commands that return data and their read method:
 # 1 = single-line, 2 = multi-line
@@ -240,9 +241,7 @@ class StkConnectClient:
         self._connected = False
         logger.info("Disconnected from STK")
 
-    async def send_command(
-        self, command: str, timeout: float = 120.0
-    ) -> StkResult:
+    async def send_command(self, command: str, timeout: float = 120.0) -> StkResult:
         """
         Send a Connect command and return the result.
 
