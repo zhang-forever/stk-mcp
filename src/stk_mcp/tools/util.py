@@ -8,107 +8,165 @@ from stk_mcp.app import mcp
 from stk_mcp.tools._common import get_client
 from stk_mcp.validation import CommandValidationError, validate_raw_command
 
-# Common STK unit names and abbreviations mapped to their Connect dimension.
-# Units_Convert requires the dimension; unknown units fall back to the
-# deprecated ConvertUnit command, which infers it from the unit pair.
-_UNIT_DIMENSIONS: dict[str, str] = {
+# Unit names and abbreviations mapped to (STK dimension, canonical abbreviation).
+# Values follow STK's unit reference; Units_Convert only accepts units valid for
+# the chosen dimension. Unknown pairs fall back to the deprecated ConvertUnit.
+_UNIT_TABLE: dict[str, tuple[str, str]] = {
     # Distance
-    "m": "Distance",
-    "meter": "Distance",
-    "meters": "Distance",
-    "km": "Distance",
-    "kilometer": "Distance",
-    "kilometers": "Distance",
-    "cm": "Distance",
-    "centimeter": "Distance",
-    "centimeters": "Distance",
-    "mm": "Distance",
-    "millimeter": "Distance",
-    "millimeters": "Distance",
-    "ft": "Distance",
-    "foot": "Distance",
-    "feet": "Distance",
-    "mi": "Distance",
-    "mile": "Distance",
-    "miles": "Distance",
-    "nmi": "Distance",
-    "nauticalmile": "Distance",
-    "nauticalmiles": "Distance",
-    "in": "Distance",
-    "inch": "Distance",
-    "inches": "Distance",
-    "kilofeet": "Distance",
+    "m": ("Distance", "m"),
+    "meter": ("Distance", "m"),
+    "meters": ("Distance", "m"),
+    "km": ("Distance", "km"),
+    "kilometer": ("Distance", "km"),
+    "kilometers": ("Distance", "km"),
+    "ft": ("Distance", "ft"),
+    "foot": ("Distance", "ft"),
+    "feet": ("Distance", "ft"),
+    "mi": ("Distance", "mi"),
+    "mile": ("Distance", "mi"),
+    "miles": ("Distance", "mi"),
+    "nm": ("Distance", "nm"),
+    "nmi": ("Distance", "nm"),
+    "nauticalmile": ("Distance", "nm"),
+    "nauticalmiles": ("Distance", "nm"),
+    "au": ("Distance", "Au"),
+    "astronomicalunit": ("Distance", "Au"),
+    "re": ("Distance", "Re"),
+    "earthradii": ("Distance", "Re"),
+    "kft": ("Distance", "kft"),
+    "kilofeet": ("Distance", "kft"),
+    "fur": ("Distance", "fur"),
+    "furlong": ("Distance", "fur"),
+    "fm": ("Distance", "fm"),
+    "fathom": ("Distance", "fm"),
+    "leag": ("Distance", "leag"),
+    "league": ("Distance", "leag"),
+    # SmallDistance
+    "in": ("SmallDistance", "in"),
+    "inch": ("SmallDistance", "in"),
+    "inches": ("SmallDistance", "in"),
+    "cm": ("SmallDistance", "cm"),
+    "centimeter": ("SmallDistance", "cm"),
+    "centimeters": ("SmallDistance", "cm"),
+    "mm": ("SmallDistance", "mm"),
+    "millimeter": ("SmallDistance", "mm"),
+    "millimeters": ("SmallDistance", "mm"),
+    "um": ("SmallDistance", "um"),
+    "micron": ("SmallDistance", "um"),
+    "microns": ("SmallDistance", "um"),
+    "nanom": ("SmallDistance", "nanom"),
+    "nanometer": ("SmallDistance", "nanom"),
     # Time
-    "sec": "Time",
-    "second": "Time",
-    "seconds": "Time",
-    "min": "Time",
-    "minute": "Time",
-    "minutes": "Time",
-    "hr": "Time",
-    "hour": "Time",
-    "hours": "Time",
-    "day": "Time",
-    "days": "Time",
+    "sec": ("Time", "sec"),
+    "second": ("Time", "sec"),
+    "seconds": ("Time", "sec"),
+    "s": ("Time", "sec"),
+    "min": ("Time", "min"),
+    "minute": ("Time", "min"),
+    "minutes": ("Time", "min"),
+    "hr": ("Time", "hr"),
+    "hour": ("Time", "hr"),
+    "hours": ("Time", "hr"),
+    "day": ("Time", "day"),
+    "days": ("Time", "day"),
+    "cd": ("Time", "cd"),
+    "centiday": ("Time", "cd"),
+    "fn": ("Time", "FN"),
+    "fortnight": ("Time", "FN"),
+    "yr": ("Time", "yr"),
+    "year": ("Time", "yr"),
+    "years": ("Time", "yr"),
     # Angle
-    "deg": "Angle",
-    "degree": "Angle",
-    "degrees": "Angle",
-    "rad": "Angle",
-    "radian": "Angle",
-    "radians": "Angle",
-    "arcsec": "Angle",
-    "arcsecond": "Angle",
-    "arcseconds": "Angle",
-    "arcmin": "Angle",
-    "arcminute": "Angle",
-    "arcminutes": "Angle",
-    # Velocity
-    "m/sec": "Velocity",
-    "m/s": "Velocity",
-    "km/sec": "Velocity",
-    "km/s": "Velocity",
-    "km/hr": "Velocity",
-    "km/h": "Velocity",
-    "mph": "Velocity",
+    "deg": ("Angle", "deg"),
+    "degree": ("Angle", "deg"),
+    "degrees": ("Angle", "deg"),
+    "rad": ("Angle", "rad"),
+    "radian": ("Angle", "rad"),
+    "radians": ("Angle", "rad"),
+    "arcsec": ("Angle", "arcSec"),
+    "arcsecond": ("Angle", "arcSec"),
+    "arcseconds": ("Angle", "arcSec"),
+    "arcmin": ("Angle", "arcMin"),
+    "arcminute": ("Angle", "arcMin"),
+    "arcminutes": ("Angle", "arcMin"),
+    "dms": ("Angle", "DMS"),
+    "hms": ("Angle", "HMS"),
+    "mrad": ("Angle", "mrad"),
+    "milliradian": ("Angle", "mrad"),
+    "urad": ("Angle", "urad"),
+    "microradian": ("Angle", "urad"),
+    "revs": ("Angle", "revs"),
+    "revolution": ("Angle", "revs"),
+    "semic": ("Angle", "semiC"),
+    "mdeg": ("Angle", "mdeg"),
+    "millidegree": ("Angle", "mdeg"),
     # Mass
-    "kg": "Mass",
-    "kilogram": "Mass",
-    "kilograms": "Mass",
-    "g": "Mass",
-    "gram": "Mass",
-    "grams": "Mass",
-    "lb": "Mass",
-    "pound": "Mass",
-    "pounds": "Mass",
+    "kg": ("Mass", "kg"),
+    "kilogram": ("Mass", "kg"),
+    "kilograms": ("Mass", "kg"),
+    "g": ("Mass", "g"),
+    "gram": ("Mass", "g"),
+    "grams": ("Mass", "g"),
+    "mg": ("Mass", "mg"),
+    "milligram": ("Mass", "mg"),
+    "milligrams": ("Mass", "mg"),
+    "lb": ("Mass", "lb"),
+    "pound": ("Mass", "lb"),
+    "pounds": ("Mass", "lb"),
+    "slug": ("Mass", "slug"),
+    "slugs": ("Mass", "slug"),
     # Temperature
-    "k": "Temperature",
-    "kelvin": "Temperature",
-    "c": "Temperature",
-    "celsius": "Temperature",
-    "f": "Temperature",
-    "fahrenheit": "Temperature",
+    "k": ("Temperature", "K"),
+    "kelvin": ("Temperature", "K"),
+    "c": ("Temperature", "degC"),
+    "celsius": ("Temperature", "degC"),
+    "degc": ("Temperature", "degC"),
+    "f": ("Temperature", "degF"),
+    "fahrenheit": ("Temperature", "degF"),
+    "degf": ("Temperature", "degF"),
     # Frequency
-    "hz": "Frequency",
-    "hertz": "Frequency",
-    "khz": "Frequency",
-    "mhz": "Frequency",
-    "ghz": "Frequency",
+    "hz": ("Frequency", "Hz"),
+    "hertz": ("Frequency", "Hz"),
+    "khz": ("Frequency", "KHz"),
+    "kilohertz": ("Frequency", "KHz"),
+    "mhz": ("Frequency", "MHz"),
+    "megahertz": ("Frequency", "MHz"),
+    "ghz": ("Frequency", "GHz"),
+    "gigahertz": ("Frequency", "GHz"),
+    "thz": ("Frequency", "THz"),
+    "terahertz": ("Frequency", "THz"),
+    # DopplerVelocity
+    "m/s": ("DopplerVelocity", "m/s"),
+    "m/sec": ("DopplerVelocity", "m/s"),
+    "fps": ("DopplerVelocity", "fps"),
+    "ft/s": ("DopplerVelocity", "fps"),
+    "kph": ("DopplerVelocity", "kph"),
+    "km/h": ("DopplerVelocity", "kph"),
+    "km/hr": ("DopplerVelocity", "kph"),
+    "kts": ("DopplerVelocity", "kts"),
+    "knot": ("DopplerVelocity", "kts"),
+    "knots": ("DopplerVelocity", "kts"),
+    "mph": ("DopplerVelocity", "mph"),
 }
 
 
-def _unit_dimension(from_unit: str, to_unit: str) -> tuple[str | None, str]:
-    """Return the shared dimension, or an error message when they conflict."""
-    source = _UNIT_DIMENSIONS.get(from_unit.strip().lower())
-    target = _UNIT_DIMENSIONS.get(to_unit.strip().lower())
-    if source and target:
-        if source != target:
-            return None, (
+def _unit_conversion(from_unit: str, to_unit: str) -> tuple[str | None, str, str, str]:
+    """Return (dimension, canonical from, canonical to, error message)."""
+    source = _UNIT_TABLE.get(from_unit.strip().lower())
+    target = _UNIT_TABLE.get(to_unit.strip().lower())
+    if source is None or target is None:
+        return None, from_unit, to_unit, ""
+    if source[0] != target[0]:
+        return (
+            None,
+            from_unit,
+            to_unit,
+            (
                 f"Units '{from_unit}' and '{to_unit}' belong to different "
-                f"dimensions ({source}, {target})"
-            )
-        return source, ""
-    return None, ""
+                f"dimensions ({source[0]}, {target[0]})"
+            ),
+        )
+    return source[0], source[1], target[1], ""
 
 
 @mcp.tool()
@@ -234,11 +292,11 @@ async def stk_util(
     elif action == "convert_unit":
         if not from_unit or not to_unit:
             return "Parameters 'from_unit' and 'to_unit' are required"
-        dimension, error = _unit_dimension(from_unit, to_unit)
+        dimension, source_unit, target_unit, error = _unit_conversion(from_unit, to_unit)
         if error:
             return error
         if dimension:
-            cmd = f'Units_Convert * Unit {dimension} "{from_unit}" "{to_unit}" "{value}"'
+            cmd = f'Units_Convert * Unit {dimension} "{source_unit}" "{target_unit}" "{value}"'
         else:
             cmd = f"ConvertUnit {from_unit} {to_unit} {value}"
         r = await client.send_command(cmd)

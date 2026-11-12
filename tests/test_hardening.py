@@ -126,5 +126,19 @@ async def test_convert_unit_rejects_mixed_dimensions():
 @pytest.mark.asyncio
 async def test_convert_unit_falls_back_for_unknown_units():
     client = UnitClient()
-    await stk_util(context(client), "convert_unit", from_unit="furlong", to_unit="m", value=1.0)
-    assert client.commands[-1] == "ConvertUnit furlong m 1.0"
+    await stk_util(context(client), "convert_unit", from_unit="smoot", to_unit="m", value=1.0)
+    assert client.commands[-1] == "ConvertUnit smoot m 1.0"
+
+
+@pytest.mark.asyncio
+async def test_convert_unit_uses_doppler_velocity_dimension():
+    client = UnitClient()
+    await stk_util(context(client), "convert_unit", from_unit="m/s", to_unit="mph", value=1.0)
+    assert client.commands[-1] == 'Units_Convert * Unit DopplerVelocity "m/s" "mph" "1.0"'
+
+
+@pytest.mark.asyncio
+async def test_convert_unit_canonicalizes_temperature_aliases():
+    client = UnitClient()
+    await stk_util(context(client), "convert_unit", from_unit="c", to_unit="f", value=0.0)
+    assert client.commands[-1] == 'Units_Convert * Unit Temperature "degC" "degF" "0.0"'
